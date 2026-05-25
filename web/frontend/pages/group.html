@@ -1,0 +1,84 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">分组管理</h4>
+    <button class="btn btn-primary" onclick="showAddGroup()">
+        <i class="bi bi-plus-lg"></i> 新增分组
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>分组ID</th>
+                        <th>分组名称</th>
+                        <th>包含设备</th>
+                        <th>输出端口</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="groupTableBody">
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initGroupPage() {
+    await loadGroups();
+}
+
+async function loadGroups() {
+    try {
+        const result = await api('GET', '/groups');
+        if (result && result.code === 0) {
+            renderGroupTable(result.data || []);
+        }
+    } catch (error) {
+        showToast('加载分组列表失败', 'danger');
+    }
+}
+
+function renderGroupTable(groups) {
+    const tbody = document.getElementById('groupTableBody');
+    if (groups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">暂无分组</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = groups.map(group => `
+        <tr>
+            <td><code>${group.id}</code></td>
+            <td>${group.name}</td>
+            <td>${(group.devices || []).join(', ') || '-'}</td>
+            <td>${group.port || '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action" onclick="editGroup('${group.id}')">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteGroup('${group.id}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showAddGroup() {
+    showToast('新增分组功能开发中', 'warning');
+}
+
+function editGroup(id) {
+    showToast('编辑分组功能开发中', 'warning');
+}
+
+async function deleteGroup(id) {
+    if (!await confirmAction(`确定删除分组 ${id}？`)) return;
+    showToast('删除分组功能开发中', 'warning');
+}
+</script>

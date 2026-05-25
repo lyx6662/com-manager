@@ -1,0 +1,92 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">报警记录</h4>
+    <div>
+        <span class="badge bg-danger me-2">未确认: <span id="unackedCount">0</span></span>
+        <button class="btn btn-outline-primary" onclick="loadAlarms()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>设备</th>
+                        <th>数据点</th>
+                        <th>级别</th>
+                        <th>消息</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="alarmTableBody">
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initAlarmPage() {
+    await loadAlarms();
+}
+
+async function loadAlarms() {
+    try {
+        const result = await api('GET', '/alarm');
+        if (result && result.code === 0) {
+            renderAlarmTable(result.data || []);
+        }
+
+        const statsResult = await api('GET', '/alarm/stats');
+        if (statsResult && statsResult.code === 0) {
+            document.getElementById('unackedCount').textContent = statsResult.data?.unacked || 0;
+        }
+    } catch (error) {
+        showToast('加载报警记录失败', 'danger');
+    }
+}
+
+function renderAlarmTable(alarms) {
+    const tbody = document.getElementById('alarmTableBody');
+    if (alarms.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无报警</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = alarms.map(alarm => `
+        <tr>
+            <td>${formatTime(alarm.timestamp)}</td>
+            <td>${alarm.device_id}</td>
+            <td>${alarm.point_name}</td>
+            <td><span class="badge bg-${alarm.level === 'critical' ? 'danger' : 'warning'}">${alarm.level}</span></td>
+            <td>${alarm.message}</td>
+            <td>${alarm.acked ? '<span class="badge bg-secondary">已确认</span>' : '<span class="badge bg-danger">未确认</span>'}</td>
+            <td>
+                ${!alarm.acked ? `<button class="btn btn-sm btn-outline-success btn-action" onclick="ackAlarm('${alarm.id}')">
+                    <i class="bi bi-check"></i> 确认
+                </button>` : ''}
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function ackAlarm(id) {
+    try {
+        const result = await api('PUT', `/alarm/${id}/ack`);
+        if (result && result.code === 0) {
+            showToast('已确认');
+            await loadAlarms();
+        }
+    } catch (error) {
+        showToast('确认失败', 'danger');
+    }
+}
+</script>

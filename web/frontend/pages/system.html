@@ -1,0 +1,166 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">系统设置</h4>
+    <button class="btn btn-outline-primary" onclick="reloadConfig()">
+        <i class="bi bi-arrow-clockwise"></i> 热重载配置
+    </button>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>系统信息
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tbody id="systemInfoBody">
+                        <tr>
+                            <td colspan="2" class="text-center text-muted">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-shield-lock me-2"></i>修改密码
+            </div>
+            <div class="card-body">
+                <form id="passwordForm">
+                    <div class="mb-3">
+                        <label class="form-label">当前密码</label>
+                        <input type="password" class="form-control" id="currentPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">新密码</label>
+                        <input type="password" class="form-control" id="newPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">确认新密码</label>
+                        <input type="password" class="form-control" id="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">修改密码</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-gear me-2"></i>系统配置
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="mb-3">
+                        <label class="form-label">系统名称</label>
+                        <input type="text" class="form-control" id="systemName">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">日志级别</label>
+                        <select class="form-select" id="logLevel">
+                            <option value="debug">Debug</option>
+                            <option value="info">Info</option>
+                            <option value="warn">Warn</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">保存配置</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-download me-2"></i>备份与恢复
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="backupConfig()">
+                        <i class="bi bi-download"></i> 备份配置
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="restoreConfig()">
+                        <i class="bi bi-upload"></i> 恢复配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initSystemPage() {
+    await loadSystemInfo();
+}
+
+async function loadSystemInfo() {
+    try {
+        const result = await api('GET', '/system/info');
+        if (result && result.code === 0) {
+            const info = result.data;
+            document.getElementById('systemInfoBody').innerHTML = `
+                <tr><td>版本</td><td>${info.version}</td></tr>
+                <tr><td>系统名称</td><td>${info.name}</td></tr>
+                <tr><td>Go版本</td><td>${info.go_version}</td></tr>
+                <tr><td>CPU核心数</td><td>${info.cpu_count}</td></tr>
+                <tr><td>协程数</td><td>${info.goroutines}</td></tr>
+                <tr><td>内存使用</td><td>${info.memory_alloc} MB</td></tr>
+                <tr><td>系统内存</td><td>${info.memory_sys} MB</td></tr>
+                <tr><td>GC次数</td><td>${info.gc_count}</td></tr>
+            `;
+
+            document.getElementById('systemName').value = info.name;
+        }
+    } catch (error) {
+        showToast('加载系统信息失败', 'danger');
+    }
+}
+
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newPwd = document.getElementById('newPassword').value;
+    const confirmPwd = document.getElementById('confirmPassword').value;
+
+    if (newPwd !== confirmPwd) {
+        showToast('两次密码不一致', 'danger');
+        return;
+    }
+
+    showToast('密码修改功能开发中', 'warning');
+});
+
+document.getElementById('configForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    showToast('配置保存功能开发中', 'warning');
+});
+
+async function reloadConfig() {
+    if (!await confirmAction('确定热重载配置？')) return;
+
+    try {
+        const result = await api('POST', '/system/config/reload');
+        if (result && result.code === 0) {
+            showToast('配置重载成功');
+        }
+    } catch (error) {
+        showToast('配置重载失败', 'danger');
+    }
+}
+
+async function backupConfig() {
+    try {
+        const result = await api('POST', '/system/backup');
+        if (result && result.code === 0) {
+            showToast('备份成功');
+        }
+    } catch (error) {
+        showToast('备份失败', 'danger');
+    }
+}
+
+async function restoreConfig() {
+    if (!await confirmAction('确定恢复配置？当前配置将被覆盖！')) return;
+    showToast('恢复配置功能开发中', 'warning');
+}
+</script>

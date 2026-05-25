@@ -1,0 +1,125 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">输出配置</h4>
+    <button class="btn btn-primary" onclick="showAddOutput()">
+        <i class="bi bi-plus-lg"></i> 新增输出
+    </button>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-ethernet me-2"></i>Modbus TCP 输出
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名称</th>
+                                <th>端口</th>
+                                <th>从站ID</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tcpOutputBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-usb me-2"></i>Modbus RTU 输出
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名称</th>
+                                <th>串口</th>
+                                <th>从站ID</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rtuOutputBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initOutputPage() {
+    await loadOutputs();
+}
+
+async function loadOutputs() {
+    try {
+        const result = await api('GET', '/outputs');
+        if (result && result.code === 0) {
+            renderTcpOutputs(result.data?.modbus_tcp_servers || []);
+            renderRtuOutputs(result.data?.modbus_rtu_servers || []);
+        }
+    } catch (error) {
+        showToast('加载输出配置失败', 'danger');
+    }
+}
+
+function renderTcpOutputs(outputs) {
+    const tbody = document.getElementById('tcpOutputBody');
+    if (outputs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">暂无配置</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = outputs.map(output => `
+        <tr>
+            <td><code>${output.id}</code></td>
+            <td>${output.name}</td>
+            <td>${output.listen_port}</td>
+            <td>${output.slave_id}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action"><i class="bi bi-pencil"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderRtuOutputs(outputs) {
+    const tbody = document.getElementById('rtuOutputBody');
+    if (outputs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">暂无配置</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = outputs.map(output => `
+        <tr>
+            <td><code>${output.id}</code></td>
+            <td>${output.name}</td>
+            <td>${output.port}</td>
+            <td>${output.slave_id}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action"><i class="bi bi-pencil"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showAddOutput() {
+    showToast('新增输出功能开发中', 'warning');
+}
+</script>

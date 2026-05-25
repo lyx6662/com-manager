@@ -1,0 +1,113 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">点表管理</h4>
+    <div>
+        <select class="form-select d-inline-block w-auto me-2" id="deviceSelect">
+            <option value="">选择设备</option>
+        </select>
+        <button class="btn btn-outline-primary me-2" onclick="exportMapping()">
+            <i class="bi bi-download"></i> 导出
+        </button>
+        <button class="btn btn-outline-primary" onclick="importMapping()">
+            <i class="bi bi-upload"></i> 导入
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>数据点名称</th>
+                        <th>描述</th>
+                        <th>寄存器地址</th>
+                        <th>数据类型</th>
+                        <th>缩放系数</th>
+                        <th>偏移量</th>
+                        <th>单位</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="mappingTableBody">
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">请先选择设备</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initMappingPage() {
+    await loadDeviceSelect();
+}
+
+async function loadDeviceSelect() {
+    try {
+        const result = await api('GET', '/devices');
+        if (result && result.code === 0) {
+            const select = document.getElementById('deviceSelect');
+            select.innerHTML = '<option value="">选择设备</option>';
+            (result.data || []).forEach(device => {
+                select.innerHTML += `<option value="${device.id}">${device.name} (${device.id})</option>`;
+            });
+            select.addEventListener('change', loadMapping);
+        }
+    } catch (error) {
+        showToast('加载设备列表失败', 'danger');
+    }
+}
+
+async function loadMapping() {
+    const deviceId = document.getElementById('deviceSelect').value;
+    if (!deviceId) return;
+
+    try {
+        const result = await api('GET', `/mappings/${deviceId}`);
+        if (result && result.code === 0) {
+            renderMappingTable(result.data?.points || []);
+        }
+    } catch (error) {
+        showToast('加载点表失败', 'danger');
+    }
+}
+
+function renderMappingTable(points) {
+    const tbody = document.getElementById('mappingTableBody');
+    if (points.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">暂无点表数据</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = points.map(point => `
+        <tr>
+            <td><code>${point.name}</code></td>
+            <td>${point.description || '-'}</td>
+            <td>${point.register}</td>
+            <td>${point.data_type}</td>
+            <td>${point.scale || 1}</td>
+            <td>${point.offset || 0}</td>
+            <td>${point.unit || '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action" onclick="editPoint('${point.name}')">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function exportMapping() {
+    showToast('导出功能开发中', 'warning');
+}
+
+function importMapping() {
+    showToast('导入功能开发中', 'warning');
+}
+
+function editPoint(name) {
+    showToast('编辑点表功能开发中', 'warning');
+}
+</script>

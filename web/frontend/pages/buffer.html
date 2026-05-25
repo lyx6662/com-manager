@@ -1,0 +1,119 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">断点续传状态</h4>
+    <button class="btn btn-outline-primary" onclick="refreshBufferStatus()">
+        <i class="bi bi-arrow-clockwise"></i> 刷新
+    </button>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-primary" id="totalRecords">0</h5>
+                <p class="card-text text-muted">总记录数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-success" id="transmittedRecords">0</h5>
+                <p class="card-text text-muted">已补传</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-warning" id="pendingRecords">0</h5>
+                <p class="card-text text-muted">待补传</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-arrow-repeat me-2"></i>各组补传状态
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>分组ID</th>
+                        <th>分组名称</th>
+                        <th>待补传数量</th>
+                        <th>最早数据时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="bufferTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initBufferPage() {
+    await loadBufferStatus();
+}
+
+async function loadBufferStatus() {
+    try {
+        const result = await api('GET', '/buffer/status');
+        if (result && result.code === 0) {
+            renderBufferTable(result.data?.groups || []);
+        }
+    } catch (error) {
+        showToast('加载补传状态失败', 'danger');
+    }
+}
+
+function renderBufferTable(groups) {
+    const tbody = document.getElementById('bufferTableBody');
+    if (groups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无分组</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = groups.map(group => `
+        <tr>
+            <td><code>${group.id}</code></td>
+            <td>${group.name}</td>
+            <td>${group.pending || 0}</td>
+            <td>${formatTime(group.earliest)}</td>
+            <td>${group.pending > 0 ? '<span class="badge bg-warning">补传中</span>' : '<span class="badge bg-success">正常</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action" onclick="retryGroup('${group.id}')">
+                    <i class="bi bi-arrow-repeat"></i> 重传
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function refreshBufferStatus() {
+    await loadBufferStatus();
+    showToast('已刷新');
+}
+
+async function retryGroup(groupId) {
+    if (!await confirmAction(`确定手动触发分组 ${groupId} 的数据补传？`)) return;
+
+    try {
+        const result = await api('POST', `/buffer/retry/${groupId}`);
+        if (result && result.code === 0) {
+            showToast('补传已触发');
+            await loadBufferStatus();
+        }
+    } catch (error) {
+        showToast('触发补传失败', 'danger');
+    }
+}
+</script>

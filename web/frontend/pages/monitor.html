@@ -1,0 +1,125 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">实时监控</h4>
+    <div>
+        <span class="badge bg-success me-2" id="onlineCount">在线: 0</span>
+        <span class="badge bg-danger" id="offlineCount">离线: 0</span>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-primary" id="totalDevices">0</h5>
+                <p class="card-text text-muted">设备总数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-success" id="onlineDevices">0</h5>
+                <p class="card-text text-muted">在线设备</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-danger" id="offlineDevices">0</h5>
+                <p class="card-text text-muted">离线设备</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-warning" id="alarmCount">0</h5>
+                <p class="card-text text-muted">未确认报警</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-activity me-2"></i>设备状态
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>设备ID</th>
+                        <th>设备名称</th>
+                        <th>状态</th>
+                        <th>最后轮询</th>
+                        <th>错误次数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="monitorTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function initMonitorPage() {
+    await loadDeviceStatus();
+    // 每5秒刷新一次
+    setInterval(loadDeviceStatus, 5000);
+}
+
+async function loadDeviceStatus() {
+    try {
+        const result = await api('GET', '/monitor/devices');
+        if (result && result.code === 0) {
+            const data = result.data;
+            document.getElementById('totalDevices').textContent = data.total || 0;
+            document.getElementById('onlineDevices').textContent = data.online || 0;
+            document.getElementById('offlineDevices').textContent = data.offline || 0;
+            document.getElementById('onlineCount').textContent = `在线: ${data.online || 0}`;
+            document.getElementById('offlineCount').textContent = `离线: ${data.offline || 0}`;
+        }
+
+        const deviceResult = await api('GET', '/devices');
+        if (deviceResult && deviceResult.code === 0) {
+            renderMonitorTable(deviceResult.data || []);
+        }
+    } catch (error) {
+        console.error('加载设备状态失败', error);
+    }
+}
+
+function renderMonitorTable(devices) {
+    const tbody = document.getElementById('monitorTableBody');
+    if (devices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无设备</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = devices.map(device => `
+        <tr>
+            <td><code>${device.id}</code></td>
+            <td>${device.name}</td>
+            <td>${formatStatus(device.online)}</td>
+            <td>${formatTime(device.last_poll)}</td>
+            <td>${device.error_count || 0}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action" onclick="viewDeviceData('${device.id}')">
+                    <i class="bi bi-eye"></i> 详情
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function viewDeviceData(id) {
+    showToast('设备数据详情功能开发中', 'warning');
+}
+</script>
