@@ -6,7 +6,15 @@
       "Bash(go mod *)",
       "Bash(cmd.exe *)",
       "Bash(powershell.exe *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(tasklist.exe)",
+      "Bash(\"C:/Go/bin/go.exe\" version *)",
+      "Bash(export PATH=\"$PATH:/c/Go/bin\")",
+      "Bash(go version *)",
+      "Bash(export GOPROXY=https://goproxy.cn,direct)",
+      "Bash(go build *)"
     ]
   }
 }

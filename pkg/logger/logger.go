@@ -7,7 +7,6 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinish/lumberjack.v2"
 )
 
 // Logger 日志封装
@@ -37,20 +36,18 @@ func New(level, logPath string) (*Logger, error) {
 	// 控制台输出
 	consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
 
-	// 文件输出 (带日志轮转)
+	// 文件输出
 	fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
-	fileWriter := &lumberjack.Logger{
-		Filename:   filepath.Join(logPath, "com-manager.log"),
-		MaxSize:    100, // MB
-		MaxBackups: 5,
-		MaxAge:     30, // 天
-		Compress:   true,
+	logFile := filepath.Join(logPath, "com-manager.log")
+	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("打开日志文件失败: %w", err)
 	}
 
 	// 创建核心
 	core := zapcore.NewTee(
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), logLevel),
-		zapcore.NewCore(fileEncoder, zapcore.AddSync(fileWriter), logLevel),
+		zapcore.NewCore(fileEncoder, zapcore.AddSync(file), logLevel),
 	)
 
 	logger := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(0))
