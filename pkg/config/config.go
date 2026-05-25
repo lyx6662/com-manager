@@ -132,6 +132,31 @@ type GroupOverride struct {
 	PriorityMode  string `yaml:"priority_mode"`
 }
 
+// Manager 配置管理器
+type Manager struct {
+	path string
+	cfg  *Config
+}
+
+// NewManager 创建配置管理器
+func NewManager(path string) (*Manager, error) {
+	cfg, err := Load(path)
+	if err != nil {
+		return nil, err
+	}
+	return &Manager{path: path, cfg: cfg}, nil
+}
+
+// Get 获取配置
+func (m *Manager) Get() *Config {
+	return m.cfg
+}
+
+// Save 保存配置到文件
+func (m *Manager) Save() error {
+	return Save(m.path, m.cfg)
+}
+
 // Load 加载配置文件
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -148,6 +173,147 @@ func Load(path string) (*Config, error) {
 	setDefaults(cfg)
 
 	return cfg, nil
+}
+
+// Save 保存配置到文件
+func Save(path string, cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("序列化配置失败: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("写入配置文件失败: %w", err)
+	}
+
+	return nil
+}
+
+// === 设备管理方法 ===
+
+// GetSerialDevice 获取串口设备
+func (m *Manager) GetSerialDevice(id string) *SerialDeviceConfig {
+	for i := range m.cfg.SerialDevices {
+		if m.cfg.SerialDevices[i].ID == id {
+			return &m.cfg.SerialDevices[i]
+		}
+	}
+	return nil
+}
+
+// GetNetworkDevice 获取网口设备
+func (m *Manager) GetNetworkDevice(id string) *NetworkDeviceConfig {
+	for i := range m.cfg.NetworkDevices {
+		if m.cfg.NetworkDevices[i].ID == id {
+			return &m.cfg.NetworkDevices[i]
+		}
+	}
+	return nil
+}
+
+// AddSerialDevice 添加串口设备
+func (m *Manager) AddSerialDevice(dev SerialDeviceConfig) error {
+	if m.GetSerialDevice(dev.ID) != nil {
+		return fmt.Errorf("设备已存在: %s", dev.ID)
+	}
+	m.cfg.SerialDevices = append(m.cfg.SerialDevices, dev)
+	return m.Save()
+}
+
+// UpdateSerialDevice 更新串口设备
+func (m *Manager) UpdateSerialDevice(dev SerialDeviceConfig) error {
+	for i := range m.cfg.SerialDevices {
+		if m.cfg.SerialDevices[i].ID == dev.ID {
+			m.cfg.SerialDevices[i] = dev
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("设备不存在: %s", dev.ID)
+}
+
+// DeleteSerialDevice 删除串口设备
+func (m *Manager) DeleteSerialDevice(id string) error {
+	for i := range m.cfg.SerialDevices {
+		if m.cfg.SerialDevices[i].ID == id {
+			m.cfg.SerialDevices = append(m.cfg.SerialDevices[:i], m.cfg.SerialDevices[i+1:]...)
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("设备不存在: %s", id)
+}
+
+// AddNetworkDevice 添加网口设备
+func (m *Manager) AddNetworkDevice(dev NetworkDeviceConfig) error {
+	if m.GetNetworkDevice(dev.ID) != nil {
+		return fmt.Errorf("设备已存在: %s", dev.ID)
+	}
+	m.cfg.NetworkDevices = append(m.cfg.NetworkDevices, dev)
+	return m.Save()
+}
+
+// UpdateNetworkDevice 更新网口设备
+func (m *Manager) UpdateNetworkDevice(dev NetworkDeviceConfig) error {
+	for i := range m.cfg.NetworkDevices {
+		if m.cfg.NetworkDevices[i].ID == dev.ID {
+			m.cfg.NetworkDevices[i] = dev
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("设备不存在: %s", dev.ID)
+}
+
+// DeleteNetworkDevice 删除网口设备
+func (m *Manager) DeleteNetworkDevice(id string) error {
+	for i := range m.cfg.NetworkDevices {
+		if m.cfg.NetworkDevices[i].ID == id {
+			m.cfg.NetworkDevices = append(m.cfg.NetworkDevices[:i], m.cfg.NetworkDevices[i+1:]...)
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("设备不存在: %s", id)
+}
+
+// === 输出配置管理方法 ===
+
+// GetModbusTCPServer 获取Modbus TCP输出配置
+func (m *Manager) GetModbusTCPServer(id string) *ModbusTCPServerConfig {
+	for i := range m.cfg.Outputs.ModbusTCPServers {
+		if m.cfg.Outputs.ModbusTCPServers[i].ID == id {
+			return &m.cfg.Outputs.ModbusTCPServers[i]
+		}
+	}
+	return nil
+}
+
+// AddModbusTCPServer 添加Modbus TCP输出配置
+func (m *Manager) AddModbusTCPServer(srv ModbusTCPServerConfig) error {
+	if m.GetModbusTCPServer(srv.ID) != nil {
+		return fmt.Errorf("输出配置已存在: %s", srv.ID)
+	}
+	m.cfg.Outputs.ModbusTCPServers = append(m.cfg.Outputs.ModbusTCPServers, srv)
+	return m.Save()
+}
+
+// UpdateModbusTCPServer 更新Modbus TCP输出配置
+func (m *Manager) UpdateModbusTCPServer(srv ModbusTCPServerConfig) error {
+	for i := range m.cfg.Outputs.ModbusTCPServers {
+		if m.cfg.Outputs.ModbusTCPServers[i].ID == srv.ID {
+			m.cfg.Outputs.ModbusTCPServers[i] = srv
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("输出配置不存在: %s", srv.ID)
+}
+
+// DeleteModbusTCPServer 删除Modbus TCP输出配置
+func (m *Manager) DeleteModbusTCPServer(id string) error {
+	for i := range m.cfg.Outputs.ModbusTCPServers {
+		if m.cfg.Outputs.ModbusTCPServers[i].ID == id {
+			m.cfg.Outputs.ModbusTCPServers = append(m.cfg.Outputs.ModbusTCPServers[:i], m.cfg.Outputs.ModbusTCPServers[i+1:]...)
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("输出配置不存在: %s", id)
 }
 
 func setDefaults(cfg *Config) {

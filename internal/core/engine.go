@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/lyx6662/com-manager/internal/protocol/modbus/tcp"
 	"github.com/lyx6662/com-manager/internal/storage/buffer"
 	"github.com/lyx6662/com-manager/internal/web"
 	"github.com/lyx6662/com-manager/pkg/config"
@@ -13,22 +14,26 @@ import (
 
 // Engine 核心引擎
 type Engine struct {
-	cfg     *config.Config
-	log     *logger.Logger
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
+	cfgMgr       *config.Manager
+	cfg          *config.Config
+	log          *logger.Logger
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 
 	// 各管理器
 	webServer     *web.Server
 	offlineBuffer *buffer.OfflineBuffer
+	tcpServers    map[string]*tcp.Server  // Modbus TCP 输出服务器
 }
 
 // NewEngine 创建引擎
-func NewEngine(cfg *config.Config, log *logger.Logger) (*Engine, error) {
+func NewEngine(cfgMgr *config.Manager, log *logger.Logger) (*Engine, error) {
 	engine := &Engine{
-		cfg: cfg,
-		log: log,
+		cfgMgr:    cfgMgr,
+		cfg:       cfgMgr.Get(),
+		log:       log,
+		tcpServers: make(map[string]*tcp.Server),
 	}
 
 	return engine, nil
@@ -45,39 +50,23 @@ func (e *Engine) Start(ctx context.Context) error {
 		return fmt.Errorf("初始化存储失败: %w", err)
 	}
 
-	// 2. 初始化设备管理器
-	if err := e.initDeviceManager(); err != nil {
-		return fmt.Errorf("初始化设备管理器失败: %w", err)
-	}
-
-	// 3. 初始化分组管理器
-	if err := e.initGroupManager(); err != nil {
-		return fmt.Errorf("初始化分组管理器失败: %w", err)
-	}
-
-	// 4. 初始化映射管理器
-	if err := e.initMappingManager(); err != nil {
-		return fmt.Errorf("初始化映射管理器失败: %w", err)
-	}
-
-	// 5. 启动数据采集
-	if err := e.startCollectors(); err != nil {
-		return fmt.Errorf("启动数据采集失败: %w", err)
-	}
-
-	// 6. 启动输出服务
+	// 2. 启动输出服务 (Modbus TCP Server)
 	if err := e.startOutputs(); err != nil {
 		return fmt.Errorf("启动输出服务失败: %w", err)
 	}
 
-	// 7. 启动Web服务
+	// 3. 启动Web服务
 	if e.cfg.Web.Enabled {
 		if err := e.startWebServer(); err != nil {
 			return fmt.Errorf("启动Web服务失败: %w", err)
 		}
 	}
 
-	e.log.Info("引擎启动完成")
+	e.log.Info("引擎启动完成",
+		"serial_devices", len(e.cfg.SerialDevices),
+		"network_devices", len(e.cfg.NetworkDevices),
+		"tcp_outputs", len(e.cfg.Outputs.ModbusTCPServers),
+	)
 	return nil
 }
 
@@ -85,6 +74,13 @@ func (e *Engine) Start(ctx context.Context) error {
 func (e *Engine) Stop() {
 	e.log.Info("引擎停止中...")
 	e.cancel()
+
+	// 停止所有TCP服务器
+	for id, srv := range e.tcpServers {
+		if err := srv.Close(); err != nil {
+			e.log.Error("停止TCP服务器失败", "id", id, "error", err)
+		}
+	}
 
 	if e.webServer != nil {
 		if err := e.webServer.Stop(); err != nil {
@@ -105,8 +101,30 @@ func (e *Engine) Stop() {
 // Reload 热重载配置
 func (e *Engine) Reload() error {
 	e.log.Info("重新加载配置...")
-	// TODO: 实现配置热重载
+
+	// 重新加载配置文件
+	newCfg, err := config.Load("./configs/gateway.yaml")
+	if err != nil {
+		return fmt.Errorf("加载配置失败: %w", err)
+	}
+
+	// 更新配置
+	e.cfg = newCfg
+
+	// TODO: 比较新旧配置，增量更新服务器
+
+	e.log.Info("配置重载成功")
 	return nil
+}
+
+// GetConfigManager 获取配置管理器
+func (e *Engine) GetConfigManager() *config.Manager {
+	return e.cfgMgr
+}
+
+// GetOfflineBuffer 获取离线缓冲
+func (e *Engine) GetOfflineBuffer() *buffer.OfflineBuffer {
+	return e.offlineBuffer
 }
 
 func (e *Engine) initStorage() error {
@@ -131,36 +149,55 @@ func (e *Engine) initStorage() error {
 	return nil
 }
 
-func (e *Engine) initDeviceManager() error {
-	e.log.Info("初始化设备管理器...",
-		"serial_devices", len(e.cfg.SerialDevices),
-		"network_devices", len(e.cfg.NetworkDevices),
-	)
-	// TODO: 创建设备管理器, 注册所有设备
-	return nil
-}
-
-func (e *Engine) initGroupManager() error {
-	e.log.Info("初始化分组管理器...")
-	// TODO: 创建分组管理器, 加载分组配置
-	return nil
-}
-
-func (e *Engine) initMappingManager() error {
-	e.log.Info("初始化映射管理器...")
-	// TODO: 创建映射管理器, 加载点表
-	return nil
-}
-
-func (e *Engine) startCollectors() error {
-	e.log.Info("启动数据采集...")
-	// TODO: 启动所有设备的采集协程
-	return nil
-}
-
 func (e *Engine) startOutputs() error {
 	e.log.Info("启动输出服务...")
-	// TODO: 启动Modbus TCP Server, Modbus RTU Slave等
+
+	// 启动所有 Modbus TCP Server
+	for _, srvCfg := range e.cfg.Outputs.ModbusTCPServers {
+		if err := e.startTCPServer(srvCfg); err != nil {
+			e.log.Error("启动TCP服务器失败",
+				"id", srvCfg.ID,
+				"port", srvCfg.ListenPort,
+				"error", err,
+			)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) startTCPServer(cfg config.ModbusTCPServerConfig) error {
+	srvCfg := tcp.ServerConfig{
+		ID:             cfg.ID,
+		Name:           cfg.Name,
+		ListenPort:     cfg.ListenPort,
+		SlaveID:        byte(cfg.SlaveID),
+		MaxConnections: cfg.MaxConnections,
+	}
+
+	srv := tcp.NewServer(srvCfg, e.log)
+
+	// 设置断点续传回调
+	if e.offlineBuffer != nil {
+		srv.OnMasterConnected(func() {
+			e.log.Info("主机已连接", "server", cfg.ID)
+			// TODO: 触发数据补传
+		})
+		srv.OnMasterDisconnected(func() {
+			e.log.Warn("主机断开连接", "server", cfg.ID)
+		})
+	}
+
+	if err := srv.Listen(); err != nil {
+		return err
+	}
+
+	e.tcpServers[cfg.ID] = srv
+	e.log.Info("TCP服务器启动成功",
+		"id", cfg.ID,
+		"port", cfg.ListenPort,
+	)
 	return nil
 }
 
@@ -170,7 +207,7 @@ func (e *Engine) startWebServer() error {
 		"port", e.cfg.Web.Port,
 	)
 
-	e.webServer = web.NewServer(e.cfg, e.log, e.offlineBuffer)
+	e.webServer = web.NewServer(e.cfgMgr, e.log, e.offlineBuffer)
 	if err := e.webServer.Start(); err != nil {
 		return fmt.Errorf("启动Web服务失败: %w", err)
 	}

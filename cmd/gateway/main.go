@@ -14,11 +14,13 @@ import (
 
 func main() {
 	// 加载配置
-	cfg, err := config.Load("./configs/gateway.yaml")
+	cfgMgr, err := config.NewManager("./configs/gateway.yaml")
 	if err != nil {
 		fmt.Printf("加载配置失败: %v\n", err)
 		os.Exit(1)
 	}
+
+	cfg := cfgMgr.Get()
 
 	// 初始化日志
 	log, err := logger.New(cfg.Server.LogLevel, cfg.Server.LogPath)
@@ -34,7 +36,7 @@ func main() {
 	)
 
 	// 创建核心引擎
-	engine, err := core.NewEngine(cfg, log)
+	engine, err := core.NewEngine(cfgMgr, log)
 	if err != nil {
 		log.Fatal("创建引擎失败", "error", err)
 	}

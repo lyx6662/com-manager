@@ -10,26 +10,33 @@ import (
 
 // DeviceHandler 设备管理处理器
 type DeviceHandler struct {
-	cfg *config.Config
-	log *logger.Logger
+	cfgMgr *config.Manager
+	log    *logger.Logger
 }
 
 // NewDeviceHandler 创建设备处理器
-func NewDeviceHandler(cfg *config.Config, log *logger.Logger) *DeviceHandler {
+func NewDeviceHandler(cfgMgr *config.Manager, log *logger.Logger) *DeviceHandler {
 	return &DeviceHandler{
-		cfg: cfg,
-		log: log,
+		cfgMgr: cfgMgr,
+		log:    log,
 	}
 }
 
 // DeviceResponse 设备响应
 type DeviceResponse struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`     // serial / network
-	Protocol string `json:"protocol"`
-	Enabled  bool   `json:"enabled"`
-	Online   bool   `json:"online"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Protocol     string `json:"protocol"`
+	Enabled      bool   `json:"enabled"`
+	Online       bool   `json:"online"`
+	Host         string `json:"host,omitempty"`
+	Port         interface{} `json:"port,omitempty"`
+	BaudRate     int    `json:"baud_rate,omitempty"`
+	SlaveID      int    `json:"slave_id"`
+	PollInterval string `json:"poll_interval"`
+	Timeout      string `json:"timeout"`
+	Retry        int    `json:"retry"`
 }
 
 // CreateDeviceRequest 创建设备请求
@@ -38,12 +45,12 @@ type CreateDeviceRequest struct {
 	Name         string `json:"name" binding:"required"`
 	Type         string `json:"type" binding:"required,oneof=serial network"`
 	Protocol     string `json:"protocol" binding:"required"`
-	Port         string `json:"port"`          // 串口
+	Port         string `json:"port"`
 	BaudRate     int    `json:"baud_rate"`
 	DataBits     int    `json:"data_bits"`
 	StopBits     int    `json:"stop_bits"`
 	Parity       string `json:"parity"`
-	Host         string `json:"host"`          // 网口
+	Host         string `json:"host"`
 	NetPort      int    `json:"net_port"`
 	SlaveID      int    `json:"slave_id"`
 	PollInterval string `json:"poll_interval"`
@@ -57,26 +64,36 @@ func (h *DeviceHandler) List(c *gin.Context) {
 	devices := make([]DeviceResponse, 0)
 
 	// 串口设备
-	for _, dev := range h.cfg.SerialDevices {
+	for _, dev := range h.cfgMgr.Get().SerialDevices {
 		devices = append(devices, DeviceResponse{
-			ID:       dev.ID,
-			Name:     dev.Name,
-			Type:     "serial",
-			Protocol: dev.Protocol,
-			Enabled:  dev.Enabled,
-			Online:   false, // TODO: 查询实际状态
+			ID:           dev.ID,
+			Name:         dev.Name,
+			Type:         "serial",
+			Protocol:     dev.Protocol,
+			Enabled:      dev.Enabled,
+			Port:         dev.Port,
+			BaudRate:     dev.BaudRate,
+			SlaveID:      dev.SlaveID,
+			PollInterval: dev.PollInterval,
+			Timeout:      dev.Timeout,
+			Retry:        dev.Retry,
 		})
 	}
 
 	// 网口设备
-	for _, dev := range h.cfg.NetworkDevices {
+	for _, dev := range h.cfgMgr.Get().NetworkDevices {
 		devices = append(devices, DeviceResponse{
-			ID:       dev.ID,
-			Name:     dev.Name,
-			Type:     "network",
-			Protocol: dev.Protocol,
-			Enabled:  dev.Enabled,
-			Online:   false, // TODO: 查询实际状态
+			ID:           dev.ID,
+			Name:         dev.Name,
+			Type:         "network",
+			Protocol:     dev.Protocol,
+			Enabled:      dev.Enabled,
+			Host:         dev.Host,
+			Port:         dev.Port,
+			SlaveID:      dev.SlaveID,
+			PollInterval: dev.PollInterval,
+			Timeout:      dev.Timeout,
+			Retry:        dev.Retry,
 		})
 	}
 
@@ -92,37 +109,45 @@ func (h *DeviceHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 
 	// 查找串口设备
-	for _, dev := range h.cfg.SerialDevices {
-		if dev.ID == id {
-			c.JSON(http.StatusOK, gin.H{
-				"code": 0,
-				"data": DeviceResponse{
-					ID:       dev.ID,
-					Name:     dev.Name,
-					Type:     "serial",
-					Protocol: dev.Protocol,
-					Enabled:  dev.Enabled,
-				},
-			})
-			return
-		}
+	if dev := h.cfgMgr.GetSerialDevice(id); dev != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"data": DeviceResponse{
+				ID:           dev.ID,
+				Name:         dev.Name,
+				Type:         "serial",
+				Protocol:     dev.Protocol,
+				Enabled:      dev.Enabled,
+				Port:         dev.Port,
+				BaudRate:     dev.BaudRate,
+				SlaveID:      dev.SlaveID,
+				PollInterval: dev.PollInterval,
+				Timeout:      dev.Timeout,
+				Retry:        dev.Retry,
+			},
+		})
+		return
 	}
 
 	// 查找网口设备
-	for _, dev := range h.cfg.NetworkDevices {
-		if dev.ID == id {
-			c.JSON(http.StatusOK, gin.H{
-				"code": 0,
-				"data": DeviceResponse{
-					ID:       dev.ID,
-					Name:     dev.Name,
-					Type:     "network",
-					Protocol: dev.Protocol,
-					Enabled:  dev.Enabled,
-				},
-			})
-			return
-		}
+	if dev := h.cfgMgr.GetNetworkDevice(id); dev != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"data": DeviceResponse{
+				ID:           dev.ID,
+				Name:         dev.Name,
+				Type:         "network",
+				Protocol:     dev.Protocol,
+				Enabled:      dev.Enabled,
+				Host:         dev.Host,
+				Port:         dev.Port,
+				SlaveID:      dev.SlaveID,
+				PollInterval: dev.PollInterval,
+				Timeout:      dev.Timeout,
+				Retry:        dev.Retry,
+			},
+		})
+		return
 	}
 
 	c.JSON(http.StatusNotFound, gin.H{
@@ -142,7 +167,51 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// TODO: 保存到配置文件
+	if req.Type == "serial" {
+		dev := config.SerialDeviceConfig{
+			ID:           req.ID,
+			Name:         req.Name,
+			Port:         req.Port,
+			BaudRate:     req.BaudRate,
+			DataBits:     req.DataBits,
+			StopBits:     req.StopBits,
+			Parity:       req.Parity,
+			Protocol:     req.Protocol,
+			SlaveID:      req.SlaveID,
+			PollInterval: req.PollInterval,
+			Timeout:      req.Timeout,
+			Retry:        req.Retry,
+			Enabled:      req.Enabled,
+		}
+		if err := h.cfgMgr.AddSerialDevice(dev); err != nil {
+			c.JSON(http.StatusConflict, gin.H{
+				"code":    409,
+				"message": err.Error(),
+			})
+			return
+		}
+	} else {
+		dev := config.NetworkDeviceConfig{
+			ID:           req.ID,
+			Name:         req.Name,
+			Host:         req.Host,
+			Port:         req.NetPort,
+			Protocol:     req.Protocol,
+			SlaveID:      req.SlaveID,
+			PollInterval: req.PollInterval,
+			Timeout:      req.Timeout,
+			Retry:        req.Retry,
+			Enabled:      req.Enabled,
+		}
+		if err := h.cfgMgr.AddNetworkDevice(dev); err != nil {
+			c.JSON(http.StatusConflict, gin.H{
+				"code":    409,
+				"message": err.Error(),
+			})
+			return
+		}
+	}
+
 	h.log.Info("创建设备", "id", req.ID, "name", req.Name, "type", req.Type)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -164,7 +233,53 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// TODO: 更新配置文件
+	req.ID = id
+
+	if req.Type == "serial" {
+		dev := config.SerialDeviceConfig{
+			ID:           req.ID,
+			Name:         req.Name,
+			Port:         req.Port,
+			BaudRate:     req.BaudRate,
+			DataBits:     req.DataBits,
+			StopBits:     req.StopBits,
+			Parity:       req.Parity,
+			Protocol:     req.Protocol,
+			SlaveID:      req.SlaveID,
+			PollInterval: req.PollInterval,
+			Timeout:      req.Timeout,
+			Retry:        req.Retry,
+			Enabled:      req.Enabled,
+		}
+		if err := h.cfgMgr.UpdateSerialDevice(dev); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": err.Error(),
+			})
+			return
+		}
+	} else {
+		dev := config.NetworkDeviceConfig{
+			ID:           req.ID,
+			Name:         req.Name,
+			Host:         req.Host,
+			Port:         req.NetPort,
+			Protocol:     req.Protocol,
+			SlaveID:      req.SlaveID,
+			PollInterval: req.PollInterval,
+			Timeout:      req.Timeout,
+			Retry:        req.Retry,
+			Enabled:      req.Enabled,
+		}
+		if err := h.cfgMgr.UpdateNetworkDevice(dev); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": err.Error(),
+			})
+			return
+		}
+	}
+
 	h.log.Info("更新设备", "id", id)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -177,12 +292,23 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 func (h *DeviceHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: 从配置文件删除
-	h.log.Info("删除设备", "id", id)
+	// 尝试删除串口设备
+	if err := h.cfgMgr.DeleteSerialDevice(id); err == nil {
+		h.log.Info("删除串口设备", "id", id)
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
+	// 尝试删除网口设备
+	if err := h.cfgMgr.DeleteNetworkDevice(id); err == nil {
+		h.log.Info("删除网口设备", "id", id)
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
+		return
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{
+		"code":    404,
+		"message": "设备不存在",
 	})
 }
 
@@ -190,7 +316,9 @@ func (h *DeviceHandler) Delete(c *gin.Context) {
 func (h *DeviceHandler) GetStatus(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: 查询实际设备状态
+	// TODO: 查询实际设备连接状态
+	_ = id
+
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{

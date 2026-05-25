@@ -14,11 +14,12 @@ import (
 
 // Server Web服务器
 type Server struct {
-	cfg      *config.Config
-	log      *logger.Logger
-	engine   *gin.Engine
-	server   *http.Server
-	buf      *buffer.OfflineBuffer
+	cfgMgr    *config.Manager
+	cfg       *config.Config
+	log       *logger.Logger
+	engine    *gin.Engine
+	server    *http.Server
+	buf       *buffer.OfflineBuffer
 
 	// 处理器
 	deviceHandler  *handler.DeviceHandler
@@ -32,13 +33,14 @@ type Server struct {
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfg *config.Config, log *logger.Logger, buf *buffer.OfflineBuffer) *Server {
+func NewServer(cfgMgr *config.Manager, log *logger.Logger, buf *buffer.OfflineBuffer) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
 	s := &Server{
-		cfg: cfg,
-		log: log,
-		buf: buf,
+		cfgMgr: cfgMgr,
+		cfg:    cfgMgr.Get(),
+		log:    log,
+		buf:    buf,
 	}
 
 	s.initHandlers()
@@ -49,14 +51,14 @@ func NewServer(cfg *config.Config, log *logger.Logger, buf *buffer.OfflineBuffer
 
 // initHandlers 初始化处理器
 func (s *Server) initHandlers() {
-	s.deviceHandler = handler.NewDeviceHandler(s.cfg, s.log)
-	s.groupHandler = handler.NewGroupHandler(s.log)
-	s.mappingHandler = handler.NewMappingHandler(s.log)
-	s.outputHandler = handler.NewOutputHandler(s.cfg, s.log)
+	s.deviceHandler = handler.NewDeviceHandler(s.cfgMgr, s.log)
+	s.groupHandler = handler.NewGroupHandler(s.cfgMgr, s.log)
+	s.mappingHandler = handler.NewMappingHandler(s.cfgMgr, s.log)
+	s.outputHandler = handler.NewOutputHandler(s.cfgMgr, s.log)
 	s.monitorHandler = handler.NewMonitorHandler(s.log)
 	s.alarmHandler = handler.NewAlarmHandler(s.log)
 	s.bufferHandler = handler.NewBufferHandler(s.buf, s.log)
-	s.systemHandler = handler.NewSystemHandler(s.cfg, s.log)
+	s.systemHandler = handler.NewSystemHandler(s.cfgMgr, s.log)
 }
 
 // initRoutes 初始化路由
