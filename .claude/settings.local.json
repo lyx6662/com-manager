@@ -14,7 +14,8 @@
       "Bash(export PATH=\"$PATH:/c/Go/bin\")",
       "Bash(go version *)",
       "Bash(export GOPROXY=https://goproxy.cn,direct)",
-      "Bash(go build *)"
+      "Bash(go build *)",
+      "Bash(PATH=__TRACKED_VAR__:/c/Go/bin GOPROXY=https://goproxy.cn,direct go build -o com-manager.exe cmd/gateway/main.go)"
     ]
   }
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/lyx6662/com-manager/internal/storage/buffer"
+	"github.com/lyx6662/com-manager/internal/web"
 	"github.com/lyx6662/com-manager/pkg/config"
 	"github.com/lyx6662/com-manager/pkg/logger"
 )
@@ -18,11 +20,8 @@ type Engine struct {
 	wg      sync.WaitGroup
 
 	// 各管理器
-	// deviceManager  *device.Manager
-	// groupManager   *group.Manager
-	// mappingManager *mapping.Manager
-	// webServer      *web.Server
-	// bufferManager  *buffer.Manager
+	webServer     *web.Server
+	offlineBuffer *buffer.OfflineBuffer
 }
 
 // NewEngine 创建引擎
@@ -86,6 +85,19 @@ func (e *Engine) Start(ctx context.Context) error {
 func (e *Engine) Stop() {
 	e.log.Info("引擎停止中...")
 	e.cancel()
+
+	if e.webServer != nil {
+		if err := e.webServer.Stop(); err != nil {
+			e.log.Error("停止Web服务失败", "error", err)
+		}
+	}
+
+	if e.offlineBuffer != nil {
+		if err := e.offlineBuffer.Close(); err != nil {
+			e.log.Error("关闭离线缓冲失败", "error", err)
+		}
+	}
+
 	e.wg.Wait()
 	e.log.Info("引擎已停止")
 }
@@ -99,7 +111,23 @@ func (e *Engine) Reload() error {
 
 func (e *Engine) initStorage() error {
 	e.log.Info("初始化存储...")
-	// TODO: 初始化SQLite, 缓存等
+
+	if e.cfg.OfflineBuffer.Enabled {
+		buf, err := buffer.NewOfflineBuffer(
+			e.cfg.OfflineBuffer.DBPath,
+			e.cfg.OfflineBuffer.RetentionDays,
+			e.log,
+		)
+		if err != nil {
+			return fmt.Errorf("初始化离线缓冲失败: %w", err)
+		}
+		e.offlineBuffer = buf
+		e.log.Info("离线缓冲初始化成功",
+			"path", e.cfg.OfflineBuffer.DBPath,
+			"retention_days", e.cfg.OfflineBuffer.RetentionDays,
+		)
+	}
+
 	return nil
 }
 
@@ -141,6 +169,14 @@ func (e *Engine) startWebServer() error {
 		"host", e.cfg.Web.Host,
 		"port", e.cfg.Web.Port,
 	)
-	// TODO: 启动Gin HTTP服务器
+
+	e.webServer = web.NewServer(e.cfg, e.log, e.offlineBuffer)
+	if err := e.webServer.Start(); err != nil {
+		return fmt.Errorf("启动Web服务失败: %w", err)
+	}
+
+	e.log.Info("Web服务启动成功",
+		"addr", fmt.Sprintf("%s:%d", e.cfg.Web.Host, e.cfg.Web.Port),
+	)
 	return nil
 }
