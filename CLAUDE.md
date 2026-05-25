@@ -55,6 +55,6 @@ GOOS=linux GOARCH=arm GOARM=7 go build -o com-manager-arm cmd/gateway/main.go
 
 ## 访问Web管理
 
-- 地址: http://localhost:8080
+- 地址: http://localhost:18080
 - 默认用户名: admin
 - 默认密码: admin123
