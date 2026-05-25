@@ -3,6 +3,8 @@ package buffer
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -64,6 +66,12 @@ func NewOfflineBuffer(dbPath string, retentionDays int, log *logger.Logger) (*Of
 
 // initDB 初始化数据库
 func (b *OfflineBuffer) initDB() error {
+	// 确保数据库目录存在
+	dir := filepath.Dir(b.dbPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("创建数据库目录失败: %w", err)
+	}
+
 	db, err := sql.Open("sqlite3", b.dbPath)
 	if err != nil {
 		return fmt.Errorf("打开数据库失败: %w", err)
