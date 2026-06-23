@@ -35,19 +35,27 @@ type Engine struct {
 	alarmDetector *AlarmDetector          // 报警检测器
 	tcpServers    map[string]*tcp.Server  // Modbus TCP 输出服务器
 	rtuServers    map[string]*rtu.Server  // Modbus RTU 输出服务器
-	router        *Router                 // 数据路由器
+	router        *Router                 // 数据路由器 (保留用于向后兼容)
 	collector     *Collector              // 采集调度器
 	iec61850Mgr   *iec61850.Manager       // IEC 61850 管理器
+
+	// 新架构组件
+	dataPool      *DataPool               // 统一数据共享池
+	modbusAdapter *ModbusOutputAdapter     // Modbus 输出适配器
+	iecAdapter    *IEC61850OutputAdapter   // IEC 61850 输出适配器
+	commandBus    *CommandBus             // 命令总线
+	webControl    *WebControlSource       // Web 控制来源
 }
 
 // NewEngine 创建引擎
 func NewEngine(cfgMgr *config.Manager, log *logger.Logger) (*Engine, error) {
 	engine := &Engine{
-		cfgMgr:    cfgMgr,
-		cfg:       cfgMgr.Get(),
-		log:       log,
+		cfgMgr:     cfgMgr,
+		cfg:        cfgMgr.Get(),
+		log:        log,
 		tcpServers: make(map[string]*tcp.Server),
 		rtuServers: make(map[string]*rtu.Server),
+		dataPool:   NewDataPool(log),
 	}
 
 	return engine, nil
@@ -85,8 +93,14 @@ func (e *Engine) Start(ctx context.Context) error {
 		e.log.Info("IEC 61850 服务已禁用，跳过")
 	}
 
-	// 3. 初始化数据路由器
+	// 3. 初始化数据路由器 (保留用于向后兼容)
 	e.initRouter()
+
+	// 3.5 初始化输出适配器 (新架构)
+	e.initOutputAdapters()
+
+	// 3.6 初始化命令总线 (双向控制)
+	e.initCommandBus()
 
 	// 4. 初始化报警检测器
 	e.initAlarmDetector()
@@ -100,6 +114,9 @@ func (e *Engine) Start(ctx context.Context) error {
 	if e.router != nil && e.collector != nil {
 		e.router.SetDeviceStatusProvider(e.collector)
 	}
+	if e.iecAdapter != nil && e.collector != nil {
+		e.iecAdapter.SetDeviceStatusProvider(e.collector)
+	}
 
 	// 6. 启动Web服务
 	if e.cfg.Web.Enabled {
@@ -112,6 +129,7 @@ func (e *Engine) Start(ctx context.Context) error {
 		"serial_devices", len(e.cfg.SerialDevices),
 		"network_devices", len(e.cfg.NetworkDevices),
 		"tcp_outputs", len(e.cfg.Outputs.ModbusTCPServers),
+		"data_pool_points", e.dataPool.GetDataPointCount(),
 	)
 	return nil
 }
@@ -120,6 +138,22 @@ func (e *Engine) Start(ctx context.Context) error {
 func (e *Engine) Stop() {
 	e.log.Info("引擎停止中...")
 	e.cancel()
+
+	// 停止命令总线
+	if e.commandBus != nil {
+		e.commandBus.Stop()
+		e.log.Info("命令总线已停止")
+	}
+
+	// 停止输出适配器
+	if e.modbusAdapter != nil {
+		e.modbusAdapter.Stop()
+		e.log.Info("Modbus 输出适配器已停止")
+	}
+	if e.iecAdapter != nil {
+		e.iecAdapter.Stop()
+		e.log.Info("IEC 61850 输出适配器已停止")
+	}
 
 	// 停止 IEC 61850 服务
 	if e.iec61850Mgr != nil {
@@ -562,10 +596,111 @@ func (e *Engine) initAlarmDetector() {
 	e.log.Info("报警检测器初始化完成")
 }
 
-// onDeviceData 设备数据回调 — 将数据交给路由器处理
+// initOutputAdapters 初始化输出适配器
+func (e *Engine) initOutputAdapters() {
+	// 初始化 Modbus 输出适配器
+	e.modbusAdapter = NewModbusOutputAdapter(e.log, "modbus", "default")
+	e.modbusAdapter.Init(e.dataPool)
+
+	// 设置 Modbus 服务器
+	for groupID, srv := range e.tcpServers {
+		e.modbusAdapter.SetTCPServer(srv)
+		e.log.Debug("Modbus 适配器绑定 TCP 服务器", "group", groupID)
+	}
+	for groupID, srv := range e.rtuServers {
+		e.modbusAdapter.SetRTUServer(srv)
+		e.log.Debug("Modbus 适配器绑定 RTU 服务器", "group", groupID)
+	}
+
+	// 设置映射规则（兼容旧配置格式）
+	allMappings := make([]ModbusOutputMapping, 0)
+	for _, rules := range e.cfg.Mappings {
+		for _, rule := range rules {
+			allMappings = append(allMappings, ModbusOutputMapping{
+				SourceDevice:   rule.SourceDevice,
+				SourceName:     rule.Name,
+				SourceType:     rule.SourceType,
+				DataType:       rule.DataType,
+				TargetRegister: rule.TargetRegister,
+				Scale:          rule.Scale,
+				Offset:         rule.Offset,
+				ByteOrder:      rule.ByteOrder,
+				MaxPoints:      rule.MaxPoints,
+			})
+		}
+	}
+	e.modbusAdapter.SetMappings(allMappings)
+	e.modbusAdapter.Start()
+
+	e.log.Info("Modbus 输出适配器初始化完成", "mappings", len(allMappings))
+
+	// 初始化 IEC 61850 输出适配器
+	if e.iec61850Mgr != nil {
+		e.iecAdapter = NewIEC61850OutputAdapter(e.log)
+		e.iecAdapter.Init(e.dataPool)
+		e.iecAdapter.SetIEC61850Manager(e.iec61850Mgr)
+		e.iecAdapter.SetMappings(e.cfgMgr.GetIEC61850Mappings())
+		e.iecAdapter.Start()
+
+		e.log.Info("IEC 61850 输出适配器初始化完成")
+	}
+}
+
+// initCommandBus 初始化命令总线
+func (e *Engine) initCommandBus() {
+	e.commandBus = NewCommandBus(e.log, e.dataPool)
+
+	// 注册 Modbus 写入处理器
+	modbusHandler := NewModbusWriteHandler(e.log, e.dataPool)
+	// 注册设备写入连接（这里需要根据实际设备配置来注册）
+	for _, dev := range e.cfg.NetworkDevices {
+		// 网络设备的写入功能需要通过采集器的连接来实现
+		// 暂时跳过，后续可以通过扩展采集器接口来支持
+		_ = dev
+	}
+	e.commandBus.RegisterHandler(modbusHandler)
+
+	// 注册 Web 控制来源
+	e.webControl = NewWebControlSource()
+	e.commandBus.RegisterSource(e.webControl)
+
+	// 启动命令总线
+	if err := e.commandBus.Start(); err != nil {
+		e.log.Error("启动命令总线失败", "error", err)
+	} else {
+		e.log.Info("命令总线初始化完成")
+	}
+}
+
+// GetCommandBus 获取命令总线
+func (e *Engine) GetCommandBus() *CommandBus {
+	return e.commandBus
+}
+
+// GetWebControlSource 获取 Web 控制来源
+func (e *Engine) GetWebControlSource() *WebControlSource {
+	return e.webControl
+}
+
+// GetDataPool 获取数据共享池
+func (e *Engine) GetDataPool() *DataPool {
+	return e.dataPool
+}
+
+// onDeviceData 设备数据回调 — 将数据写入共享池并处理后续逻辑
 func (e *Engine) onDeviceData(deviceID string, points []model.DataPoint) {
-	// 交给路由器刷新输出寄存器
-	e.router.UpdateData(deviceID, points)
+	// 写入统一数据共享池（会自动通知订阅的输出适配器）
+	e.dataPool.BatchUpdateData(deviceID, points)
+
+	// 交给路由器刷新输出寄存器 (保留用于向后兼容和批量数据点处理)
+	if e.router != nil {
+		e.router.UpdateData(deviceID, points)
+	}
+
+	// 处理批量数据点到 Modbus 适配器
+	if e.modbusAdapter != nil {
+		e.modbusAdapter.BatchUpdatePoints(points)
+	}
 
 	// 报警检测
 	if e.alarmDetector != nil {
