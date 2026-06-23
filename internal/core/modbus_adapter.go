@@ -135,6 +135,46 @@ func (a *ModbusOutputAdapter) SetMappingsFromConfig(rules []config.MappingRule) 
 	}
 }
 
+// SetMappingsFromOutputConfig 从新配置格式设置映射规则
+func (a *ModbusOutputAdapter) SetMappingsFromOutputConfig(mappings []config.ModbusOutputMapping, dataPoints []config.UnifiedDataPoint) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	// 构建数据点索引
+	dpIndex := make(map[string]*config.UnifiedDataPoint)
+	for i := range dataPoints {
+		dpIndex[dataPoints[i].ID] = &dataPoints[i]
+	}
+
+	a.mappings = make([]ModbusOutputMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		dp, exists := dpIndex[mapping.SourceID]
+		if !exists {
+			a.log.Warn("数据点不存在，跳过映射", "source_id", mapping.SourceID)
+			continue
+		}
+
+		// 从数据点获取设备ID和源寄存器信息
+		modbusMapping := ModbusOutputMapping{
+			SourceDevice:   dp.DeviceID,
+			SourceName:     dp.Name,
+			SourceType:     dp.RegisterType,
+			DataType:       mapping.DataType,
+			TargetRegister: mapping.TargetRegister,
+			Scale:          mapping.Scale,
+			Offset:         mapping.Offset,
+			ByteOrder:      mapping.ByteOrder,
+		}
+
+		// 如果映射中没有指定数据类型，使用数据点的类型
+		if modbusMapping.DataType == "" {
+			modbusMapping.DataType = dp.DataType
+		}
+
+		a.mappings = append(a.mappings, modbusMapping)
+	}
+}
+
 // OnDataChanged 数据变更回调
 func (a *ModbusOutputAdapter) OnDataChanged(deviceID string, pointName string, entry *DataPointEntry) {
 	a.mu.RLock()

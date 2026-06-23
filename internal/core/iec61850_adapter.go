@@ -89,6 +89,43 @@ func (a *IEC61850OutputAdapter) SetMappings(mappings []config.IEC61850MappingRul
 	a.mappings = mappings
 }
 
+// SetMappingsFromOutputConfig 从新配置格式设置映射规则
+func (a *IEC61850OutputAdapter) SetMappingsFromOutputConfig(mappings []config.IEC61850OutputMapping, dataPoints []config.UnifiedDataPoint) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	// 构建数据点索引
+	dpIndex := make(map[string]*config.UnifiedDataPoint)
+	for i := range dataPoints {
+		dpIndex[dataPoints[i].ID] = &dataPoints[i]
+	}
+
+	a.mappings = make([]config.IEC61850MappingRule, 0, len(mappings))
+	for _, mapping := range mappings {
+		dp, exists := dpIndex[mapping.SourceID]
+		if !exists {
+			a.log.Warn("数据点不存在，跳过映射", "source_id", mapping.SourceID)
+			continue
+		}
+
+		iecRule := config.IEC61850MappingRule{
+			SourceDevice: dp.DeviceID,
+			SourceName:   dp.Name,
+			IEC61850Path: mapping.IEC61850Path,
+			TargetType:   mapping.TargetType,
+			Scale:        mapping.Scale,
+			Offset:       mapping.Offset,
+		}
+
+		// 如果映射中没有指定目标类型，使用默认值
+		if iecRule.TargetType == "" {
+			iecRule.TargetType = "float32"
+		}
+
+		a.mappings = append(a.mappings, iecRule)
+	}
+}
+
 // SetDeviceStatusProvider 设置设备状态提供者
 func (a *IEC61850OutputAdapter) SetDeviceStatusProvider(provider DeviceStatusProvider) {
 	a.mu.Lock()

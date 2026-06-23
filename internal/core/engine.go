@@ -45,6 +45,11 @@ type Engine struct {
 	iecAdapter    *IEC61850OutputAdapter   // IEC 61850 输出适配器
 	commandBus    *CommandBus             // 命令总线
 	webControl    *WebControlSource       // Web 控制来源
+
+	// 新配置管理器
+	dataPointCfg  *config.DataPointFileConfig    // 数据点配置
+	outputCfg     *config.OutputFileConfigManager // 输出配置
+	useNewConfig  bool                           // 是否使用新配置格式
 }
 
 // NewEngine 创建引擎
@@ -58,7 +63,43 @@ func NewEngine(cfgMgr *config.Manager, log *logger.Logger) (*Engine, error) {
 		dataPool:   NewDataPool(log),
 	}
 
+	// 尝试加载新配置格式
+	engine.loadNewConfig()
+
 	return engine, nil
+}
+
+// loadNewConfig 加载新配置格式
+func (e *Engine) loadNewConfig() {
+	// 加载数据点配置
+	dataPointCfgPath := "./configs/data_points.yaml"
+	e.dataPointCfg = config.NewDataPointFileConfig(dataPointCfgPath)
+	if err := e.dataPointCfg.Load(); err != nil {
+		e.log.Warn("加载数据点配置失败，将使用旧配置格式", "error", err)
+		e.dataPointCfg = nil
+		return
+	}
+
+	// 加载输出配置
+	outputCfgPath := "./configs/outputs.yaml"
+	e.outputCfg = config.NewOutputFileConfigManager(outputCfgPath)
+	if err := e.outputCfg.Load(); err != nil {
+		e.log.Warn("加载输出配置失败，将使用旧配置格式", "error", err)
+		e.outputCfg = nil
+		e.dataPointCfg = nil
+		return
+	}
+
+	// 检查新配置是否有数据
+	if e.dataPointCfg.GetDataPointCount() > 0 {
+		e.useNewConfig = true
+		e.log.Info("使用新配置格式",
+			"data_points", e.dataPointCfg.GetDataPointCount(),
+		)
+	} else {
+		e.log.Info("新配置文件为空，将使用旧配置格式")
+		e.useNewConfig = false
+	}
 }
 
 // Start 启动引擎
@@ -615,36 +656,63 @@ func (e *Engine) initOutputAdapters() {
 		e.log.Debug("Modbus 适配器绑定 RTU 服务器", "group", groupID)
 	}
 
-	// 设置映射规则（兼容旧配置格式）
-	allMappings := make([]ModbusOutputMapping, 0)
-	for _, rules := range e.cfg.Mappings {
-		for _, rule := range rules {
-			allMappings = append(allMappings, ModbusOutputMapping{
-				SourceDevice:   rule.SourceDevice,
-				SourceName:     rule.Name,
-				SourceType:     rule.SourceType,
-				DataType:       rule.DataType,
-				TargetRegister: rule.TargetRegister,
-				Scale:          rule.Scale,
-				Offset:         rule.Offset,
-				ByteOrder:      rule.ByteOrder,
-				MaxPoints:      rule.MaxPoints,
-			})
+	// 根据配置格式设置映射规则
+	if e.useNewConfig && e.outputCfg != nil && e.dataPointCfg != nil {
+		// 使用新配置格式
+		modbusOutput := e.outputCfg.GetModbusOutput()
+		if modbusOutput != nil && modbusOutput.Enabled {
+			e.modbusAdapter.SetMappingsFromOutputConfig(
+				modbusOutput.Mappings,
+				e.dataPointCfg.GetDataPoints(),
+			)
+			e.log.Info("Modbus 输出适配器使用新配置格式", "mappings", len(modbusOutput.Mappings))
 		}
+	} else {
+		// 使用旧配置格式
+		allMappings := make([]ModbusOutputMapping, 0)
+		for _, rules := range e.cfg.Mappings {
+			for _, rule := range rules {
+				allMappings = append(allMappings, ModbusOutputMapping{
+					SourceDevice:   rule.SourceDevice,
+					SourceName:     rule.Name,
+					SourceType:     rule.SourceType,
+					DataType:       rule.DataType,
+					TargetRegister: rule.TargetRegister,
+					Scale:          rule.Scale,
+					Offset:         rule.Offset,
+					ByteOrder:      rule.ByteOrder,
+					MaxPoints:      rule.MaxPoints,
+				})
+			}
+		}
+		e.modbusAdapter.SetMappings(allMappings)
+		e.log.Info("Modbus 输出适配器使用旧配置格式", "mappings", len(allMappings))
 	}
-	e.modbusAdapter.SetMappings(allMappings)
-	e.modbusAdapter.Start()
 
-	e.log.Info("Modbus 输出适配器初始化完成", "mappings", len(allMappings))
+	e.modbusAdapter.Start()
 
 	// 初始化 IEC 61850 输出适配器
 	if e.iec61850Mgr != nil {
 		e.iecAdapter = NewIEC61850OutputAdapter(e.log)
 		e.iecAdapter.Init(e.dataPool)
 		e.iecAdapter.SetIEC61850Manager(e.iec61850Mgr)
-		e.iecAdapter.SetMappings(e.cfgMgr.GetIEC61850Mappings())
-		e.iecAdapter.Start()
 
+		// 根据配置格式设置映射规则
+		if e.useNewConfig && e.outputCfg != nil && e.dataPointCfg != nil {
+			iecOutput := e.outputCfg.GetIEC61850Output()
+			if iecOutput != nil && iecOutput.Enabled {
+				e.iecAdapter.SetMappingsFromOutputConfig(
+					iecOutput.Mappings,
+					e.dataPointCfg.GetDataPoints(),
+				)
+				e.log.Info("IEC 61850 输出适配器使用新配置格式", "mappings", len(iecOutput.Mappings))
+			}
+		} else {
+			e.iecAdapter.SetMappings(e.cfgMgr.GetIEC61850Mappings())
+			e.log.Info("IEC 61850 输出适配器使用旧配置格式")
+		}
+
+		e.iecAdapter.Start()
 		e.log.Info("IEC 61850 输出适配器初始化完成")
 	}
 }
