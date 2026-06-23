@@ -29,18 +29,44 @@ async function api(method, path, data = null) {
     }
 }
 
+// 清理页面定时器
+let pageIntervals = [];
+
+function clearPageIntervals() {
+    pageIntervals.forEach(id => clearInterval(id));
+    pageIntervals = [];
+}
+
 // 页面加载
-async function loadPage(page) {
+async function loadPage(page, el) {
+    // 清理上一个页面的定时器
+    clearPageIntervals();
+
     const content = document.getElementById('content');
     content.innerHTML = '<div class="text-center py-5"><div class="loading"></div><p class="mt-3">加载中...</p></div>';
 
     try {
-        const response = await fetch(`/pages/${page}.html`);
+        const response = await fetch(`/pages/${page}.html?v=${Date.now()}`);
         if (response.ok) {
-            content.innerHTML = await response.text();
+            const html = await response.text();
+            content.innerHTML = html;
+
+            // 手动执行内联脚本（innerHTML不会执行script标签）
+            const scripts = content.querySelectorAll('script');
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement('script');
+                if (oldScript.src) {
+                    newScript.src = oldScript.src;
+                } else {
+                    newScript.textContent = oldScript.textContent;
+                }
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
+
             // 执行页面特定的初始化脚本
-            if (typeof window[`init${capitalize(page)}Page`] === 'function') {
-                window[`init${capitalize(page)}Page`]();
+            const initFn = window[`init${capitalize(page)}Page`];
+            if (typeof initFn === 'function') {
+                await initFn();
             }
         } else {
             content.innerHTML = '<div class="alert alert-warning">页面加载失败</div>';
@@ -53,7 +79,9 @@ async function loadPage(page) {
     document.querySelectorAll('.sidebar .nav-link').forEach(link => {
         link.classList.remove('active');
     });
-    event.target.closest('.nav-link').classList.add('active');
+    if (el) {
+        el.closest('.nav-link').classList.add('active');
+    }
 }
 
 // 首字母大写
@@ -81,6 +109,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             localStorage.setItem('token', authToken);
             bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
             errorDiv.classList.add('d-none');
+            startStatusCheck();
         } else {
             errorDiv.textContent = result.message || '登录失败';
             errorDiv.classList.remove('d-none');
@@ -95,6 +124,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 function logout() {
     authToken = '';
     localStorage.removeItem('token');
+    stopStatusCheck();
     showLogin();
 }
 
@@ -149,9 +179,44 @@ function formatStatus(online) {
         '<span class="status-offline"><i class="bi bi-circle-fill"></i> 离线</span>';
 }
 
+// 系统状态轮询
+let statusCheckInterval = null;
+
+async function checkSystemStatus() {
+    try {
+        var result = await api('GET', '/system/info');
+        var statusEl = document.getElementById('system-status');
+        if (result && result.code === 0 && statusEl) {
+            statusEl.innerHTML = '<i class="bi bi-circle-fill text-success"></i> 运行中';
+        } else if (statusEl) {
+            statusEl.innerHTML = '<i class="bi bi-circle-fill text-warning"></i> 异常';
+        }
+    } catch (e) {
+        var statusEl = document.getElementById('system-status');
+        if (statusEl) {
+            statusEl.innerHTML = '<i class="bi bi-circle-fill text-danger"></i> 离线';
+        }
+    }
+}
+
+function startStatusCheck() {
+    if (statusCheckInterval) clearInterval(statusCheckInterval);
+    checkSystemStatus();
+    statusCheckInterval = setInterval(checkSystemStatus, 30000);
+}
+
+function stopStatusCheck() {
+    if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+        statusCheckInterval = null;
+    }
+}
+
 // 页面初始化
 document.addEventListener('DOMContentLoaded', () => {
     if (!authToken) {
         showLogin();
+    } else {
+        startStatusCheck();
     }
 });

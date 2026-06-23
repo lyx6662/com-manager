@@ -1,8 +1,14 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">输出配置</h4>
-    <button class="btn btn-primary" onclick="showAddOutput()">
-        <i class="bi bi-plus-lg"></i> 新增输出
-    </button>
+    <div>
+        <select class="form-select d-inline-block w-auto me-2" id="outputType">
+            <option value="tcp">Modbus TCP</option>
+            <option value="rtu">Modbus RTU</option>
+        </select>
+        <button class="btn btn-primary" onclick="showAddOutput()">
+            <i class="bi bi-plus-lg"></i> 新增输出
+        </button>
+    </div>
 </div>
 
 <div class="row">
@@ -62,7 +68,78 @@
     </div>
 </div>
 
+<!-- 新增/编辑输出弹窗 -->
+<div class="modal fade" id="outputModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="outputModalTitle">新增输出</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="outputForm">
+                    <div class="mb-3">
+                        <label class="form-label">输出类型</label>
+                        <select class="form-select" id="outputProtocol" onchange="toggleOutputFields()">
+                            <option value="tcp">Modbus TCP</option>
+                            <option value="rtu">Modbus RTU</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">输出ID</label>
+                        <input type="text" class="form-control" id="outputId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">输出名称</label>
+                        <input type="text" class="form-control" id="outputName" required>
+                    </div>
+                    <div id="tcpFields">
+                        <div class="mb-3">
+                            <label class="form-label">监听端口</label>
+                            <input type="number" class="form-control" id="tcpPort" value="502" min="1" max="65535">
+                        </div>
+                    </div>
+                    <div id="rtuFields" style="display:none;">
+                        <div class="mb-3">
+                            <label class="form-label">串口号</label>
+                            <select class="form-select" id="rtuPort">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">波特率</label>
+                            <select class="form-select" id="rtuBaudRate">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="115200">115200</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">从站ID</label>
+                        <input type="number" class="form-control" id="outputSlaveId" value="1" min="1" max="247">
+                    </div>
+                    <div class="mb-3" id="maxConnectionsField">
+                        <label class="form-label">最大连接数</label>
+                        <input type="number" class="form-control" id="maxConnections" value="10" min="1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveOutput()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+var tcpOutputs = [];
+var rtuOutputs = [];
+var editingOutputType = '';
+var editingOutputIndex = -1;
+
 async function initOutputPage() {
     await loadOutputs();
 }
@@ -71,8 +148,10 @@ async function loadOutputs() {
     try {
         const result = await api('GET', '/outputs');
         if (result && result.code === 0) {
-            renderTcpOutputs(result.data?.modbus_tcp_servers || []);
-            renderRtuOutputs(result.data?.modbus_rtu_servers || []);
+            tcpOutputs = result.data?.modbus_tcp_servers || [];
+            rtuOutputs = result.data?.modbus_rtu_servers || [];
+            renderTcpOutputs(tcpOutputs);
+            renderRtuOutputs(rtuOutputs);
         }
     } catch (error) {
         showToast('加载输出配置失败', 'danger');
@@ -86,14 +165,19 @@ function renderTcpOutputs(outputs) {
         return;
     }
 
-    tbody.innerHTML = outputs.map(output => `
+    tbody.innerHTML = outputs.map((output, index) => `
         <tr>
             <td><code>${output.id}</code></td>
             <td>${output.name}</td>
             <td>${output.listen_port}</td>
             <td>${output.slave_id}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary btn-action"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="editOutput('tcp', ${index})">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteOutput('tcp', ${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
             </td>
         </tr>
     `).join('');
@@ -106,20 +190,176 @@ function renderRtuOutputs(outputs) {
         return;
     }
 
-    tbody.innerHTML = outputs.map(output => `
+    tbody.innerHTML = outputs.map((output, index) => `
         <tr>
             <td><code>${output.id}</code></td>
             <td>${output.name}</td>
             <td>${output.port}</td>
             <td>${output.slave_id}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary btn-action"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="editOutput('rtu', ${index})">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteOutput('rtu', ${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
             </td>
         </tr>
     `).join('');
 }
 
-function showAddOutput() {
-    showToast('新增输出功能开发中', 'warning');
+function toggleOutputFields() {
+    const type = document.getElementById('outputProtocol').value;
+    document.getElementById('tcpFields').style.display = type === 'tcp' ? 'block' : 'none';
+    document.getElementById('rtuFields').style.display = type === 'rtu' ? 'block' : 'none';
+    document.getElementById('maxConnectionsField').style.display = type === 'tcp' ? 'block' : 'none';
+}
+
+async function loadSerialPortsForOutput() {
+    try {
+        const result = await api('GET', '/system/serial-ports');
+        if (result && result.code === 0) {
+            const select = document.getElementById('rtuPort');
+            select.innerHTML = '';
+            (result.data || []).forEach(port => {
+                const option = document.createElement('option');
+                option.value = port.name;
+                option.textContent = port.name;
+                if (port.used) {
+                    option.textContent += ` (${port.used_by} 已占用)`;
+                    option.disabled = true;
+                    option.style.color = '#999';
+                }
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载串口列表失败:', error);
+    }
+}
+
+async function showAddOutput() {
+    document.getElementById('outputModalTitle').textContent = '新增输出';
+    document.getElementById('outputForm').reset();
+    document.getElementById('outputId').disabled = false;
+    document.getElementById('outputProtocol').value = document.getElementById('outputType').value;
+    document.getElementById('outputProtocol').disabled = false;
+    document.getElementById('tcpPort').value = 502;
+    document.getElementById('rtuBaudRate').value = 9600;
+    document.getElementById('outputSlaveId').value = 1;
+    document.getElementById('maxConnections').value = 10;
+
+    await loadSerialPortsForOutput();
+    toggleOutputFields();
+    editingOutputType = '';
+    editingOutputIndex = -1;
+    new bootstrap.Modal(document.getElementById('outputModal')).show();
+}
+
+async function editOutput(type, index) {
+    const outputs = type === 'tcp' ? tcpOutputs : rtuOutputs;
+    if (index < 0 || index >= outputs.length) return;
+
+    const output = outputs[index];
+    document.getElementById('outputModalTitle').textContent = '编辑输出';
+    document.getElementById('outputId').value = output.id;
+    document.getElementById('outputId').disabled = true;
+    document.getElementById('outputName').value = output.name;
+    document.getElementById('outputProtocol').value = type;
+    document.getElementById('outputProtocol').disabled = true;
+    document.getElementById('outputSlaveId').value = output.slave_id;
+
+    if (type === 'tcp') {
+        document.getElementById('tcpPort').value = output.listen_port || 502;
+        document.getElementById('maxConnections').value = output.max_connections || 10;
+    } else {
+        await loadSerialPortsForOutput();
+        document.getElementById('rtuPort').value = output.port || '';
+        document.getElementById('rtuBaudRate').value = output.baud_rate || 9600;
+    }
+
+    toggleOutputFields();
+    editingOutputType = type;
+    editingOutputIndex = index;
+    new bootstrap.Modal(document.getElementById('outputModal')).show();
+}
+
+async function deleteOutput(type, index) {
+    const outputs = type === 'tcp' ? tcpOutputs : rtuOutputs;
+    if (index < 0 || index >= outputs.length) return;
+    if (!await confirmAction('确定删除该输出配置？')) return;
+
+    outputs.splice(index, 1);
+    await saveOutputs();
+}
+
+async function saveOutput() {
+    const type = document.getElementById('outputProtocol').value;
+    const output = {
+        id: document.getElementById('outputId').value,
+        name: document.getElementById('outputName').value,
+        slave_id: parseInt(document.getElementById('outputSlaveId').value),
+    };
+
+    if (!output.id || !output.name) {
+        showToast('请填写ID和名称', 'warning');
+        return;
+    }
+
+    if (type === 'tcp') {
+        output.listen_port = parseInt(document.getElementById('tcpPort').value);
+        output.max_connections = parseInt(document.getElementById('maxConnections').value);
+
+        if (editingOutputIndex >= 0) {
+            tcpOutputs[editingOutputIndex] = output;
+        } else {
+            // 检查ID是否重复
+            if (tcpOutputs.some(o => o.id === output.id) || rtuOutputs.some(o => o.id === output.id)) {
+                showToast('输出ID已存在', 'warning');
+                return;
+            }
+            tcpOutputs.push(output);
+        }
+    } else {
+        output.port = document.getElementById('rtuPort').value;
+        output.baud_rate = parseInt(document.getElementById('rtuBaudRate').value);
+
+        if (!output.port) {
+            showToast('请选择串口', 'warning');
+            return;
+        }
+
+        if (editingOutputIndex >= 0) {
+            rtuOutputs[editingOutputIndex] = output;
+        } else {
+            // 检查ID是否重复
+            if (tcpOutputs.some(o => o.id === output.id) || rtuOutputs.some(o => o.id === output.id)) {
+                showToast('输出ID已存在', 'warning');
+                return;
+            }
+            rtuOutputs.push(output);
+        }
+    }
+
+    await saveOutputs();
+}
+
+async function saveOutputs() {
+    try {
+        const data = {
+            modbus_tcp_servers: tcpOutputs,
+            modbus_rtu_servers: rtuOutputs,
+        };
+        const result = await api('PUT', '/outputs', data);
+        if (result && result.code === 0) {
+            showToast('保存成功');
+            bootstrap.Modal.getInstance(document.getElementById('outputModal'))?.hide();
+            await loadOutputs();
+        } else {
+            showToast(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 }
 </script>

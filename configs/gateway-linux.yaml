@@ -1,0 +1,364 @@
+server:
+    name: com-manager-01
+    log_level: debug
+    log_path: ./logs
+web:
+    enabled: true
+    port: 18080
+    host: 0.0.0.0
+    auth:
+        enabled: true
+        username: admin
+        password: admin123
+        token_secret: change-me-in-production
+        token_expire: 24h
+    cors:
+        enabled: true
+        allowed_origins:
+            - '*'
+serial_devices:
+    - id: rtu-device-1
+      name: RTU设备1
+      port: /dev/ttyS0
+      baud_rate: 9600
+      data_bits: 8
+      stop_bits: 1
+      parity: none
+      protocol: modbus_rtu
+      slave_id: 1
+      poll_interval: 1s
+      timeout: 3s
+      retry: 3
+      enabled: false
+    - id: rtu-device-2
+      name: 串口设备2
+      port: /dev/ttyS1
+      baud_rate: 9600
+      data_bits: 8
+      stop_bits: 1
+      parity: none
+      protocol: modbus_rtu
+      slave_id: 1
+      poll_interval: 5s
+      timeout: 3s
+      retry: 3
+      enabled: false
+network_devices:
+    - id: tcp-device-1
+      name: TCP设备1
+      host: 127.0.0.1
+      port: 503
+      protocol: modbus_tcp
+      slave_id: 1
+      poll_interval: 1s
+      timeout: 3s
+      retry: 3
+      enabled: true
+      cid_file: ""
+    - id: tcp-2
+      name: tcp设备2
+      host: 127.0.0.1
+      port: 504
+      protocol: modbus_tcp
+      slave_id: 1
+      poll_interval: 5s
+      timeout: 3s
+      retry: 0
+      enabled: true
+      cid_file: ""
+outputs:
+    modbus_tcp_servers:
+        - id: "1"
+          name: modbustcp
+          listen_port: 5020
+          slave_id: 1
+          max_connections: 10
+    modbus_rtu_servers: []
+    group_devices:
+        "1":
+            - rtu-device-1
+            - tcp-device-1
+            - rtu-device-2
+            - tcp-2
+        modbustcpout:
+            - rtu-device-2
+            - tcp-2
+mappings:
+    rtu-device-1:
+        - name: RTU1-寄存器1
+          source_device: rtu-device-1
+          source_register: 0
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 0
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: RTU1-寄存器2
+          source_device: rtu-device-1
+          source_register: 1
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 1
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: RTU1-寄存器3
+          source_device: rtu-device-1
+          source_register: 2
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 2
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: RTU1-寄存器4
+          source_device: rtu-device-1
+          source_register: 3
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 3
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: RTU1-寄存器5
+          source_device: rtu-device-1
+          source_register: 4
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 4
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+    rtu-device-2:
+        - name: "1"
+          source_device: rtu-device-2
+          source_register: 0
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 5
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "2"
+          source_device: rtu-device-2
+          source_register: 1
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 6
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "3"
+          source_device: rtu-device-2
+          source_register: 2
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 7
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "4"
+          source_device: rtu-device-2
+          source_register: 3
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 8
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "5"
+          source_device: rtu-device-2
+          source_register: 4
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 9
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+    tcp-2:
+        - name: "0"
+          source_device: tcp-2
+          source_register: 0
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 15
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "1"
+          source_device: tcp-2
+          source_register: 1
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 16
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "2"
+          source_device: tcp-2
+          source_register: 2
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 17
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "3"
+          source_device: tcp-2
+          source_register: 3
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 18
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: "4"
+          source_device: tcp-2
+          source_register: 4
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 19
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+    tcp-device-1:
+        - name: TCP1-寄存器1
+          source_device: tcp-device-1
+          source_register: 0
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 10
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: TCP1-寄存器2
+          source_device: tcp-device-1
+          source_register: 1
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 11
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: TCP1-寄存器3
+          source_device: tcp-device-1
+          source_register: 2
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 12
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: TCP1-寄存器4
+          source_device: tcp-device-1
+          source_register: 3
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 13
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+        - name: TCP1-寄存器5
+          source_device: tcp-device-1
+          source_register: 4
+          source_type: holding
+          data_type: uint16
+          register_count: 1
+          target_register: 14
+          scale: 1
+          offset: 0
+          unit: ""
+          max_points: 0
+          high_limit: 0
+          low_limit: 0
+offline_buffer:
+    enabled: true
+    db_path: ./data/offline.db
+    retention_days: 10
+    max_db_size_mb: 500
+    memory_queue_size: 10000
+    flush_interval: 10m
+    report_strategy:
+        batch_size: 100
+        batch_interval: 500ms
+        max_retries: 3
+        priority_mode: time
+        concurrent_group: 1
+    group_override: {}

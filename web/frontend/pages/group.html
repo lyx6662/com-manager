@@ -13,14 +13,16 @@
                     <tr>
                         <th>分组ID</th>
                         <th>分组名称</th>
-                        <th>包含设备</th>
-                        <th>输出端口</th>
+                        <th>类型</th>
+                        <th>端口/串口</th>
+                        <th>从站ID</th>
+                        <th>设备数量</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="groupTableBody">
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">加载中...</td>
+                        <td colspan="6" class="text-center text-muted py-4">加载中...</td>
                     </tr>
                 </tbody>
             </table>
@@ -28,7 +30,82 @@
     </div>
 </div>
 
+<!-- 新增/编辑分组弹窗 -->
+<div class="modal fade" id="groupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="groupModalTitle">新增分组</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="groupForm">
+                    <div class="mb-3">
+                        <label class="form-label">分组类型</label>
+                        <select class="form-select" id="groupType" onchange="toggleGroupFields()">
+                            <option value="tcp">Modbus TCP</option>
+                            <option value="rtu">Modbus RTU</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">分组ID</label>
+                        <input type="text" class="form-control" id="groupId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">分组名称</label>
+                        <input type="text" class="form-control" id="groupName" required>
+                    </div>
+                    <div id="groupTcpFields">
+                        <div class="mb-3">
+                            <label class="form-label">监听端口</label>
+                            <input type="number" class="form-control" id="groupPort" value="502" min="1" max="65535">
+                        </div>
+                    </div>
+                    <div id="groupRtuFields" style="display:none;">
+                        <div class="mb-3">
+                            <label class="form-label">串口号</label>
+                            <select class="form-select" id="groupSerialPort">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">波特率</label>
+                            <select class="form-select" id="groupBaudRate">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="115200">115200</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">从站ID</label>
+                        <input type="number" class="form-control" id="groupSlaveId" value="1" min="1" max="247">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">包含设备</label>
+                        <select class="form-select" id="groupDevices" multiple size="4">
+                            <option value="">加载中...</option>
+                        </select>
+                        <div class="form-text">按住 Ctrl 可多选</div>
+                    </div>
+                    <div class="mb-3" id="groupMaxConnField">
+                        <label class="form-label">最大连接数</label>
+                        <input type="number" class="form-control" id="groupMaxConn" value="10" min="1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveGroup()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+var editingGroupId = '';
+
 async function initGroupPage() {
     await loadGroups();
 }
@@ -47,7 +124,7 @@ async function loadGroups() {
 function renderGroupTable(groups) {
     const tbody = document.getElementById('groupTableBody');
     if (groups.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">暂无分组</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无分组</td></tr>';
         return;
     }
 
@@ -55,10 +132,12 @@ function renderGroupTable(groups) {
         <tr>
             <td><code>${group.id}</code></td>
             <td>${group.name}</td>
-            <td>${(group.devices || []).join(', ') || '-'}</td>
-            <td>${group.port || '-'}</td>
+            <td><span class="badge bg-${group.type === 'tcp' ? 'primary' : 'info'}">${group.type === 'tcp' ? 'TCP' : 'RTU'}</span></td>
+            <td>${group.type === 'tcp' ? '端口 ' + group.port : group.port}</td>
+            <td>${group.slave_id || 1}</td>
+            <td><span class="badge bg-secondary">${(group.devices || []).length} 个设备</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-primary btn-action" onclick="editGroup('${group.id}')">
+                <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="editGroup('${group.id}')">
                     <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteGroup('${group.id}')">
@@ -69,16 +148,171 @@ function renderGroupTable(groups) {
     `).join('');
 }
 
-function showAddGroup() {
-    showToast('新增分组功能开发中', 'warning');
+function toggleGroupFields() {
+    const type = document.getElementById('groupType').value;
+    document.getElementById('groupTcpFields').style.display = type === 'tcp' ? 'block' : 'none';
+    document.getElementById('groupRtuFields').style.display = type === 'rtu' ? 'block' : 'none';
+    document.getElementById('groupMaxConnField').style.display = type === 'tcp' ? 'block' : 'none';
 }
 
-function editGroup(id) {
-    showToast('编辑分组功能开发中', 'warning');
+async function loadSerialPortsForGroup() {
+    try {
+        const result = await api('GET', '/system/serial-ports');
+        if (result && result.code === 0) {
+            const select = document.getElementById('groupSerialPort');
+            select.innerHTML = '';
+            (result.data || []).forEach(port => {
+                const option = document.createElement('option');
+                option.value = port.name;
+                option.textContent = port.name;
+                if (port.used) {
+                    option.textContent += ` (${port.used_by} 已占用)`;
+                    option.disabled = true;
+                    option.style.color = '#999';
+                }
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载串口列表失败:', error);
+    }
+}
+
+async function loadDevicesForGroup(selectedDevices) {
+    try {
+        const result = await api('GET', '/devices');
+        if (result && result.code === 0) {
+            const select = document.getElementById('groupDevices');
+            select.innerHTML = '';
+            (result.data || []).forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = `${device.name} (${device.id})`;
+                if (selectedDevices && selectedDevices.includes(device.id)) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载设备列表失败:', error);
+    }
+}
+
+async function showAddGroup() {
+    document.getElementById('groupModalTitle').textContent = '新增分组';
+    document.getElementById('groupForm').reset();
+    document.getElementById('groupId').disabled = false;
+    document.getElementById('groupType').value = 'tcp';
+    document.getElementById('groupType').disabled = false;
+    document.getElementById('groupPort').value = 502;
+    document.getElementById('groupSlaveId').value = 1;
+    document.getElementById('groupMaxConn').value = 10;
+    editingGroupId = '';
+
+    await loadSerialPortsForGroup();
+    await loadDevicesForGroup([]);
+    toggleGroupFields();
+    new bootstrap.Modal(document.getElementById('groupModal')).show();
+}
+
+async function editGroup(id) {
+    try {
+        const result = await api('GET', `/groups/${id}`);
+        if (!result || result.code !== 0) {
+            showToast('获取分组信息失败', 'danger');
+            return;
+        }
+
+        const group = result.data;
+        document.getElementById('groupModalTitle').textContent = '编辑分组';
+        document.getElementById('groupId').value = group.id;
+        document.getElementById('groupId').disabled = true;
+        document.getElementById('groupName').value = group.name;
+        document.getElementById('groupType').value = group.type || 'tcp';
+        document.getElementById('groupType').disabled = true;
+        document.getElementById('groupSlaveId').value = group.slave_id || 1;
+
+        if (group.type === 'tcp') {
+            document.getElementById('groupPort').value = group.port || 502;
+            document.getElementById('groupMaxConn').value = group.max_connections || 10;
+        } else {
+            await loadSerialPortsForGroup();
+            document.getElementById('groupSerialPort').value = group.port || '';
+            document.getElementById('groupBaudRate').value = group.baud_rate || 9600;
+        }
+
+        // 加载设备列表并选中已分配的设备
+        await loadDevicesForGroup(group.devices || []);
+
+        editingGroupId = id;
+        toggleGroupFields();
+        new bootstrap.Modal(document.getElementById('groupModal')).show();
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 }
 
 async function deleteGroup(id) {
     if (!await confirmAction(`确定删除分组 ${id}？`)) return;
-    showToast('删除分组功能开发中', 'warning');
+
+    try {
+        const result = await api('DELETE', `/groups/${id}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            await loadGroups();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function saveGroup() {
+    const type = document.getElementById('groupType').value;
+    const data = {
+        id: document.getElementById('groupId').value,
+        name: document.getElementById('groupName').value,
+        type: type,
+        slave_id: parseInt(document.getElementById('groupSlaveId').value),
+    };
+
+    if (!data.id || !data.name) {
+        showToast('请填写ID和名称', 'warning');
+        return;
+    }
+
+    if (type === 'tcp') {
+        data.port = parseInt(document.getElementById('groupPort').value);
+        data.max_connections = parseInt(document.getElementById('groupMaxConn').value);
+    } else {
+        data.port = document.getElementById('groupSerialPort').value;
+        data.baud_rate = parseInt(document.getElementById('groupBaudRate').value);
+        if (!data.port) {
+            showToast('请选择串口', 'warning');
+            return;
+        }
+    }
+
+    // 获取选中的设备
+    const devicesSelect = document.getElementById('groupDevices');
+    const selectedDevices = Array.from(devicesSelect.selectedOptions).map(option => option.value).filter(v => v);
+    data.devices = selectedDevices;
+
+    try {
+        const isEdit = editingGroupId !== '';
+        const url = isEdit ? `/groups/${editingGroupId}` : '/groups';
+        const result = await api(isEdit ? 'PUT' : 'POST', url, data);
+        if (result && result.code === 0) {
+            showToast(isEdit ? '更新成功' : '创建成功');
+            bootstrap.Modal.getInstance(document.getElementById('groupModal')).hide();
+            await loadGroups();
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 }
 </script>

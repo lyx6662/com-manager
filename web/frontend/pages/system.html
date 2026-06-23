@@ -86,12 +86,82 @@
                 </div>
             </div>
         </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-heart-pulse me-2"></i>进程管理
+            </div>
+            <div class="card-body">
+                <div class="mb-3" id="heartbeatStatus">
+                    <span class="text-muted">加载中...</span>
+                </div>
+                <div class="d-grid">
+                    <button class="btn btn-danger" onclick="restartProgram()">
+                        <i class="bi bi-arrow-clockwise"></i> 重启程序
+                    </button>
+                </div>
+                <div class="form-text mt-2">重启后看门狗将在20秒内自动拉起程序</div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
 async function initSystemPage() {
     await loadSystemInfo();
+    await loadHeartbeat();
+    // 每10秒刷新心跳状态
+    setInterval(loadHeartbeat, 10000);
+}
+
+async function loadHeartbeat() {
+    try {
+        const result = await api('GET', '/buffer/heartbeat');
+        if (result && result.code === 0) {
+            const d = result.data;
+            const el = document.getElementById('heartbeatStatus');
+            if (d.alive) {
+                const lastTime = new Date(d.last_heartbeat).toLocaleString();
+                el.innerHTML = `<span class="badge bg-success">运行中</span>
+                    <span class="ms-2">最后心跳: ${lastTime} (${d.elapsed_sec}秒前)</span>`;
+            } else {
+                el.innerHTML = `<span class="badge bg-danger">已停止</span>
+                    <span class="ms-2">心跳超时 ${d.elapsed_sec} 秒</span>`;
+            }
+        }
+    } catch (e) {
+        document.getElementById('heartbeatStatus').innerHTML =
+            '<span class="badge bg-secondary">未知</span>';
+    }
+}
+
+async function restartProgram() {
+    if (!await confirmAction('确定要重启程序吗？看门狗将在20秒后自动拉起')) return;
+
+    try {
+        const result = await api('POST', '/system/restart');
+        if (result && result.code === 0) {
+            showToast('程序正在重启，请等待约20秒后刷新页面');
+            // 开始轮询心跳状态
+            setTimeout(() => {
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const r = await api('GET', '/buffer/heartbeat');
+                        if (r && r.code === 0 && r.data.alive) {
+                            clearInterval(pollInterval);
+                            showToast('程序已恢复运行');
+                            await loadSystemInfo();
+                            await loadHeartbeat();
+                        }
+                    } catch (e) {}
+                }, 3000);
+            }, 5000);
+        } else {
+            showToast(result.message || '重启失败', 'danger');
+        }
+    } catch (error) {
+        showToast('重启请求发送失败', 'danger');
+    }
 }
 
 async function loadSystemInfo() {
@@ -108,6 +178,9 @@ async function loadSystemInfo() {
                 <tr><td>内存使用</td><td>${info.memory_alloc} MB</td></tr>
                 <tr><td>系统内存</td><td>${info.memory_sys} MB</td></tr>
                 <tr><td>GC次数</td><td>${info.gc_count}</td></tr>
+                <tr><td>串口设备</td><td>${info.serial_devices || 0}</td></tr>
+                <tr><td>网口设备</td><td>${info.network_devices || 0}</td></tr>
+                <tr><td>TCP输出</td><td>${info.tcp_outputs || 0}</td></tr>
             `;
 
             document.getElementById('systemName').value = info.name;
@@ -119,6 +192,7 @@ async function loadSystemInfo() {
 
 document.getElementById('passwordForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const currentPwd = document.getElementById('currentPassword').value;
     const newPwd = document.getElementById('newPassword').value;
     const confirmPwd = document.getElementById('confirmPassword').value;
 
@@ -127,12 +201,46 @@ document.getElementById('passwordForm').addEventListener('submit', async (e) => 
         return;
     }
 
-    showToast('密码修改功能开发中', 'warning');
+    if (newPwd.length < 6) {
+        showToast('密码长度不能少于6位', 'danger');
+        return;
+    }
+
+    try {
+        const result = await api('PUT', '/system/config', {
+            password: newPwd,
+            old_password: currentPwd
+        });
+        if (result && result.code === 0) {
+            showToast('密码修改成功，请重新登录');
+            document.getElementById('passwordForm').reset();
+            logout();
+        } else {
+            showToast(result.message || '密码修改失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 });
 
 document.getElementById('configForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    showToast('配置保存功能开发中', 'warning');
+    const name = document.getElementById('systemName').value;
+    const logLevel = document.getElementById('logLevel').value;
+
+    try {
+        const result = await api('PUT', '/system/config', {
+            name: name,
+            log_level: logLevel
+        });
+        if (result && result.code === 0) {
+            showToast('配置保存成功');
+        } else {
+            showToast(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 });
 
 async function reloadConfig() {
@@ -142,6 +250,9 @@ async function reloadConfig() {
         const result = await api('POST', '/system/config/reload');
         if (result && result.code === 0) {
             showToast('配置重载成功');
+            await loadSystemInfo();
+        } else {
+            showToast(result.message || '重载失败', 'danger');
         }
     } catch (error) {
         showToast('配置重载失败', 'danger');
@@ -152,7 +263,17 @@ async function backupConfig() {
     try {
         const result = await api('POST', '/system/backup');
         if (result && result.code === 0) {
-            showToast('备份成功');
+            // 下载备份文件
+            const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gateway-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('备份下载成功');
+        } else {
+            showToast(result.message || '备份失败', 'danger');
         }
     } catch (error) {
         showToast('备份失败', 'danger');
@@ -161,6 +282,30 @@ async function backupConfig() {
 
 async function restoreConfig() {
     if (!await confirmAction('确定恢复配置？当前配置将被覆盖！')) return;
-    showToast('恢复配置功能开发中', 'warning');
+
+    // 创建文件选择器
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const config = JSON.parse(text);
+
+            const result = await api('POST', '/system/restore', config);
+            if (result && result.code === 0) {
+                showToast('配置恢复成功，建议重启程序');
+                await loadSystemInfo();
+            } else {
+                showToast(result.message || '恢复失败', 'danger');
+            }
+        } catch (error) {
+            showToast('文件解析失败: ' + error.message, 'danger');
+        }
+    };
+    input.click();
 }
 </script>

@@ -1,8 +1,13 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">断点续传状态</h4>
-    <button class="btn btn-outline-primary" onclick="refreshBufferStatus()">
-        <i class="bi bi-arrow-clockwise"></i> 刷新
-    </button>
+    <div>
+        <button class="btn btn-outline-danger me-2" onclick="purgeTransmitted()">
+            <i class="bi bi-trash"></i> 清除已补传
+        </button>
+        <button class="btn btn-outline-primary" onclick="refreshBufferStatus()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新
+        </button>
+    </div>
 </div>
 
 <div class="row mb-4">
@@ -68,7 +73,25 @@ async function loadBufferStatus() {
     try {
         const result = await api('GET', '/buffer/status');
         if (result && result.code === 0) {
-            renderBufferTable(result.data?.groups || []);
+            var groups = result.data?.groups || [];
+            renderBufferTable(groups);
+
+            // 计算汇总数据
+            var totalPending = 0;
+            var totalRecords = 0;
+            groups.forEach(function(g) {
+                totalPending += (g.pending || 0);
+                totalRecords += (g.total_records || 0);
+            });
+            var totalTransmitted = totalRecords - totalPending;
+
+            var el;
+            el = document.getElementById('totalRecords');
+            if (el) el.textContent = totalRecords;
+            el = document.getElementById('transmittedRecords');
+            if (el) el.textContent = totalTransmitted;
+            el = document.getElementById('pendingRecords');
+            if (el) el.textContent = totalPending;
         }
     } catch (error) {
         showToast('加载补传状态失败', 'danger');
@@ -90,8 +113,14 @@ function renderBufferTable(groups) {
             <td>${formatTime(group.earliest)}</td>
             <td>${group.pending > 0 ? '<span class="badge bg-warning">补传中</span>' : '<span class="badge bg-success">正常</span>'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary btn-action" onclick="retryGroup('${group.id}')">
+                <button class="btn btn-sm btn-outline-info btn-action me-1" onclick="viewRecords('${group.id}')">
+                    <i class="bi bi-eye"></i> 查看数据
+                </button>
+                <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="retryGroup('${group.id}')">
                     <i class="bi bi-arrow-repeat"></i> 重传
+                </button>
+                <button class="btn btn-sm btn-outline-warning btn-action" onclick="markGroupTransmitted('${group.id}')">
+                    <i class="bi bi-check-all"></i> 全部标记
                 </button>
             </td>
         </tr>
@@ -115,5 +144,143 @@ async function retryGroup(groupId) {
     } catch (error) {
         showToast('触发补传失败', 'danger');
     }
+}
+
+async function markGroupTransmitted(groupId) {
+    if (!await confirmAction(`确定将分组 ${groupId} 的所有待补传数据标记为已补传？`)) return;
+
+    try {
+        const result = await api('POST', `/buffer/mark-transmitted/${groupId}`);
+        if (result && result.code === 0) {
+            showToast(result.message || '操作成功');
+            await loadBufferStatus();
+        }
+    } catch (error) {
+        showToast('操作失败', 'danger');
+    }
+}
+
+async function purgeTransmitted() {
+    if (!await confirmAction('确定清除所有已补传数据？此操作不可恢复。')) return;
+
+    try {
+        const result = await api('POST', '/buffer/purge-transmitted');
+        if (result && result.code === 0) {
+            showToast(result.message || '清除成功');
+            await loadBufferStatus();
+        }
+    } catch (error) {
+        showToast('清除失败', 'danger');
+    }
+}
+
+// === 待补传数据查看 ===
+var currentViewGroupId = '';
+var currentPage = 1;
+
+async function viewRecords(groupId) {
+    currentViewGroupId = groupId;
+    currentPage = 1;
+
+    // 移除已存在的模态框
+    var existing = document.getElementById('recordsModal');
+    if (existing) existing.remove();
+
+    // 创建模态框
+    var modalHtml = `
+    <div class="modal fade" id="recordsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">待补传数据: ${groupId}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>设备ID</th>
+                                    <th>数据点</th>
+                                    <th>值</th>
+                                    <th>数据类型</th>
+                                    <th>质量</th>
+                                    <th>时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsTableBody">
+                                <tr><td colspan="6" class="text-center text-muted py-3">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <span id="recordsPageInfo" class="text-muted">-</span>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-1" id="recordsPrev" onclick="loadRecords(-1)" disabled>上一页</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="recordsNext" onclick="loadRecords(1)" disabled>下一页</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('recordsModal')).show();
+
+    await loadRecords(0);
+}
+
+async function loadRecords(pageDelta) {
+    if (pageDelta !== 0) {
+        currentPage += pageDelta;
+    }
+    if (currentPage < 1) currentPage = 1;
+
+    try {
+        var result = await api('GET', `/buffer/records/${currentViewGroupId}?page=${currentPage}&page_size=50`);
+        if (result && result.code === 0) {
+            var data = result.data;
+            var records = data.records || [];
+            var total = data.total || 0;
+            var pageSize = data.page_size || 50;
+            var totalPages = Math.ceil(total / pageSize);
+
+            var tbody = document.getElementById('recordsTableBody');
+            if (records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">暂无数据</td></tr>';
+            } else {
+                tbody.innerHTML = records.map(r => `
+                    <tr>
+                        <td><code>${r.device_id}</code></td>
+                        <td>${r.point_name}</td>
+                        <td><strong>${formatRecordValue(r.value)}</strong></td>
+                        <td>${r.data_type}</td>
+                        <td>${r.quality === 0 ? '<span class="badge bg-success">好</span>' : '<span class="badge bg-danger">坏</span>'}</td>
+                        <td>${formatTime(r.timestamp)}</td>
+                    </tr>
+                `).join('');
+            }
+
+            var info = document.getElementById('recordsPageInfo');
+            if (info) info.textContent = `第 ${currentPage}/${totalPages} 页, 共 ${total} 条`;
+
+            var prevBtn = document.getElementById('recordsPrev');
+            var nextBtn = document.getElementById('recordsNext');
+            if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+            if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
+        }
+    } catch (error) {
+        showToast('加载数据失败', 'danger');
+    }
+}
+
+function formatRecordValue(val) {
+    if (val === null || val === undefined) return '-';
+    if (typeof val === 'number') return val.toFixed(2);
+    if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+    return String(val);
 }
 </script>

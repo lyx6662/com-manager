@@ -1,113 +1,2423 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0">点表管理</h4>
+    <h4 class="mb-0">映射管理</h4>
     <div>
-        <select class="form-select d-inline-block w-auto me-2" id="deviceSelect">
-            <option value="">选择设备</option>
-        </select>
-        <button class="btn btn-outline-primary me-2" onclick="exportMapping()">
-            <i class="bi bi-download"></i> 导出
-        </button>
-        <button class="btn btn-outline-primary" onclick="importMapping()">
-            <i class="bi bi-upload"></i> 导入
+        <button class="btn btn-primary" onclick="showAddGroup()">
+            <i class="bi bi-plus-lg"></i> 新增分组
         </button>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>数据点名称</th>
-                        <th>描述</th>
-                        <th>寄存器地址</th>
-                        <th>数据类型</th>
-                        <th>缩放系数</th>
-                        <th>偏移量</th>
-                        <th>单位</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="mappingTableBody">
-                    <tr>
-                        <td colspan="8" class="text-center text-muted py-4">请先选择设备</td>
-                    </tr>
-                </tbody>
-            </table>
+<div class="row">
+    <!-- 左侧：输出通道树 -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-list-nested me-1"></i> 输出通道
+            </div>
+            <div class="card-body p-2" style="max-height: 70vh; overflow-y: auto;">
+                <div id="outputChannelTree">
+                    <div class="text-center text-muted py-3">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：内容区 -->
+    <div class="col-md-9">
+        <!-- Modbus 分组详情面板 -->
+        <div id="groupDetailPanel" style="display: none;">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear me-2"></i>
+                        <span id="groupDetailTitle">输出配置</span>
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editCurrentGroup()">
+                            <i class="bi bi-pencil"></i> 编辑配置
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentGroup()">
+                            <i class="bi bi-trash"></i> 删除分组
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">分组ID</div>
+                                    <div class="fw-bold" id="groupIdDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">类型</div>
+                                    <div class="fw-bold" id="groupTypeDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">端口/串口</div>
+                                    <div class="fw-bold" id="groupPortDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">从站ID</div>
+                                    <div class="fw-bold" id="groupSlaveIdDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="groupExtraInfo">
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">最大连接数</div>
+                                    <div class="fw-bold" id="groupMaxConnDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">设备数量</div>
+                                    <div class="fw-bold" id="groupDeviceCountDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-hdd-rack me-2"></i>包含设备</h5>
+                    <button class="btn btn-sm btn-success" onclick="showAddDeviceToGroup()">
+                        <i class="bi bi-plus-lg"></i> 添加设备
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>设备ID</th>
+                                    <th>设备名称</th>
+                                    <th>协议</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groupDevicesTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">暂无设备</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modbus 设备映射详情面板 -->
+        <div id="deviceMappingPanel" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-arrow-left me-2" style="cursor:pointer;" onclick="showGroupDetail(currentGroupId)" title="返回分组详情"></i>
+                        <span id="deviceMappingTitle">设备映射</span>
+                    </h5>
+                    <button class="btn btn-sm btn-primary" onclick="showAddPoint()">
+                        <i class="bi bi-plus-lg"></i> 新增数据点
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>数据点名称</th>
+                                    <th>功能码</th>
+                                    <th>源寄存器</th>
+                                    <th>数据类型</th>
+                                    <th>目标寄存器</th>
+                                    <th>缩放系数</th>
+                                    <th>偏移量</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mappingTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">暂无点表数据</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IEC 61850 服务器配置面板 -->
+        <div id="iec61850ConfigPanel" style="display: none;">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-broadcast me-2"></i>
+                        IEC 61850 服务器配置
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editIEC61850Config()">
+                            <i class="bi bi-pencil"></i> 编辑
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="restartIEC61850()">
+                            <i class="bi bi-arrow-clockwise"></i> 重启服务
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">服务状态</div>
+                                    <div class="fw-bold" id="iec61850StatusDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">监听端口</div>
+                                    <div class="fw-bold" id="iec61850PortDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">IED名称</div>
+                                    <div class="fw-bold" id="iec61850IEDDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">最大连接数</div>
+                                    <div class="fw-bold" id="iec61850MaxConnDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">映射规则数</div>
+                                    <div class="fw-bold" id="iec61850MappingCountDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center p-3">
+                                    <div class="text-muted small">ICD文件</div>
+                                    <div class="fw-bold" id="iec61850ICDDisplay">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IEC 61850 数据模型面板 -->
+        <div id="iec61850ModelPanel" style="display: none;">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-diagram-2 me-2"></i>
+                        数据模型编辑
+                    </h5>
+                    <button class="btn btn-sm btn-success" onclick="showAddLogicalDevice()">
+                        <i class="bi bi-plus-lg"></i> 新增逻辑设备
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="iec61850ModelTree">
+                        <div class="text-center text-muted py-3">暂无数据模型</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IEC 61850 映射规则面板 -->
+        <div id="iec61850MappingPanel" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-arrow-left-right me-2"></i>
+                        IEC 61850 映射规则
+                    </h5>
+                    <div>
+                        <select class="form-select form-select-sm d-inline-block me-2" style="width: auto;" id="iec61850DeviceFilter" onchange="filterIEC61850Mappings()">
+                            <option value="">全部设备</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary" onclick="showAddIEC61850Mapping()">
+                            <i class="bi bi-plus-lg"></i> 新增映射
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>源设备</th>
+                                    <th>源名称</th>
+                                    <th>源寄存器</th>
+                                    <th>IEC 61850 路径</th>
+                                    <th>数据类型</th>
+                                    <th>缩放系数</th>
+                                    <th>偏移量</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="iec61850MappingTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">暂无映射规则</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 默认提示 -->
+        <div id="defaultHint">
+            <div class="card">
+                <div class="card-body text-center text-muted py-5">
+                    <i class="bi bi-arrow-left-circle" style="font-size: 3rem;"></i>
+                    <p class="mt-3">请从左侧选择输出通道进行管理</p>
+                    <p>或点击上方"新增分组"创建新的 Modbus 分组</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增/编辑分组弹窗 -->
+<div class="modal fade" id="groupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="groupModalTitle">新增分组</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="groupForm">
+                    <div class="mb-3">
+                        <label class="form-label">分组类型</label>
+                        <select class="form-select" id="groupType" onchange="toggleGroupFields()">
+                            <option value="tcp">Modbus TCP</option>
+                            <option value="rtu">Modbus RTU</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">分组ID</label>
+                        <input type="text" class="form-control" id="groupId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">分组名称</label>
+                        <input type="text" class="form-control" id="groupName" required>
+                    </div>
+                    <div id="groupTcpFields">
+                        <div class="mb-3">
+                            <label class="form-label">监听端口</label>
+                            <input type="number" class="form-control" id="groupPort" value="502" min="1" max="65535">
+                        </div>
+                    </div>
+                    <div id="groupRtuFields" style="display:none;">
+                        <div class="mb-3">
+                            <label class="form-label">串口号</label>
+                            <select class="form-select" id="groupSerialPort">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">波特率</label>
+                            <select class="form-select" id="groupBaudRate">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="115200">115200</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">从站ID</label>
+                        <input type="number" class="form-control" id="groupSlaveId" value="1" min="1" max="247">
+                    </div>
+                    <div class="mb-3" id="groupMaxConnField">
+                        <label class="form-label">最大连接数</label>
+                        <input type="number" class="form-control" id="groupMaxConn" value="10" min="1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveGroup()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加设备到分组弹窗 -->
+<div class="modal fade" id="addDeviceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加设备到分组</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">选择设备</label>
+                    <select class="form-select" id="availableDevices" multiple size="6">
+                        <option value="">加载中...</option>
+                    </select>
+                    <div class="form-text">按住 Ctrl 可多选</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="addDevicesToGroup()">添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增/编辑数据点弹窗 -->
+<div class="modal fade" id="pointModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pointModalTitle">新增数据点</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="pointForm">
+                    <div class="mb-3">
+                        <label class="form-label">数据点名称</label>
+                        <input type="text" class="form-control" id="pointName" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">功能码</label>
+                            <select class="form-select" id="sourceType">
+                                <option value="holding">03 - 保持寄存器</option>
+                                <option value="input">04 - 输入寄存器</option>
+                                <option value="coil">01 - 线圈</option>
+                                <option value="discrete">02 - 离散输入</option>
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">寄存器地址</label>
+                            <input type="number" class="form-control" id="sourceRegister" min="0" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">数据类型</label>
+                            <select class="form-select" id="dataType">
+                                <option value="uint16">uint16</option>
+                                <option value="int16">int16</option>
+                                <option value="uint32">uint32</option>
+                                <option value="int32">int32</option>
+                                <option value="float32">float32</option>
+                                <option value="bool">bool</option>
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">寄存器数量</label>
+                            <input type="number" class="form-control" id="registerCount" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">目标输出寄存器地址</label>
+                        <input type="number" class="form-control" id="targetRegister" min="0" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">缩放系数</label>
+                            <input type="number" class="form-control" id="scale" value="1" step="0.01">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">偏移量</label>
+                            <input type="number" class="form-control" id="offset" value="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">单位</label>
+                        <input type="text" class="form-control" id="unit" placeholder="如: ℃, V, A">
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">报警上限 (0=不启用)</label>
+                            <input type="number" class="form-control" id="highLimit" value="0" step="0.01">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">报警下限 (0=不启用)</label>
+                            <input type="number" class="form-control" id="lowLimit" value="0" step="0.01">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="savePoint()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IEC 61850 服务器配置编辑弹窗 -->
+<div class="modal fade" id="iec61850ConfigModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑 IEC 61850 服务器配置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="iec61850ConfigForm">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="iec61850Enabled">
+                            <label class="form-check-label" for="iec61850Enabled">启用 IEC 61850 输出</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">监听端口</label>
+                        <input type="number" class="form-control" id="iec61850Port" value="102" min="1" max="65535">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">IED 名称</label>
+                        <input type="text" class="form-control" id="iec61850IEDName" value="GRID_GATEWAY">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">最大连接数</label>
+                        <input type="number" class="form-control" id="iec61850MaxConn" value="10" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ICD 文件输出路径</label>
+                        <input type="text" class="form-control" id="iec61850ICDOutput" value="./configs/GRID_GATEWAY.icd">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveIEC61850Config()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IEC 61850 逻辑设备/节点编辑弹窗 -->
+<div class="modal fade" id="iec61850NodeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="iec61850NodeModalTitle">新增逻辑设备</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="iec61850NodeForm">
+                    <input type="hidden" id="nodeEditType" value="">
+                    <input type="hidden" id="nodeEditOldName" value="">
+                    <div class="mb-3">
+                        <label class="form-label">名称</label>
+                        <input type="text" class="form-control" id="nodeEditName" required>
+                    </div>
+                    <!-- 逻辑节点编辑 (新增逻辑设备时可批量添加) -->
+                    <div id="nodeChildrenEditor" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">逻辑节点</label>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addNodeChildRow()">
+                                <i class="bi bi-plus"></i> 添加节点
+                            </button>
+                        </div>
+                        <div id="nodeChildrenList">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveNodeEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IEC 61850 映射规则编辑弹窗 -->
+<div class="modal fade" id="iec61850MappingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="iec61850MappingModalTitle">新增 IEC 61850 映射规则</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="iec61850MappingForm">
+                    <h6 class="text-muted mb-3">源配置</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">源设备</label>
+                            <select class="form-select" id="iec_source_device" onchange="onIECSourceDeviceChange()">
+                                <option value="">选择设备</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3" style="display: none;">
+                            <label class="form-label">源名称</label>
+                            <input type="text" class="form-control" id="iec_source_name" placeholder="数据点名称">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">源寄存器</label>
+                            <input type="number" class="form-control" id="iec_source_register" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">源类型</label>
+                            <select class="form-select" id="iec_source_type">
+                                <option value="holding">holding</option>
+                                <option value="input">input</option>
+                                <option value="coil">coil</option>
+                                <option value="discrete">discrete</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">数据类型</label>
+                            <select class="form-select" id="iec_data_type">
+                                <option value="uint16">uint16</option>
+                                <option value="int16">int16</option>
+                                <option value="uint32">uint32</option>
+                                <option value="int32">int32</option>
+                                <option value="float32">float32</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">目标类型</label>
+                            <select class="form-select" id="iec_target_type">
+                                <option value="float32">float32</option>
+                                <option value="int32">int32</option>
+                                <option value="bool">bool</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6 class="text-muted mb-3">目标配置 (IEC 61850)</h6>
+                    <div class="mb-3">
+                        <label class="form-label">IEC 61850 路径</label>
+                        <select class="form-select" id="iec_path">
+                            <option value="">选择路径</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">缩放系数</label>
+                            <input type="number" class="form-control" id="iec_scale" value="1.0" step="0.01">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">偏移量</label>
+                            <input type="number" class="form-control" id="iec_offset" value="0.0" step="0.01">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveIEC61850Mapping()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据对象编辑弹窗 -->
+<div class="modal fade" id="dataObjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dataObjectModalTitle">新增数据对象</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="dataObjectForm">
+                    <input type="hidden" id="dataObjectOldName" value="">
+                    <div class="mb-3">
+                        <label class="form-label">数据对象名称</label>
+                        <input type="text" class="form-control" id="dataObjectName" required placeholder="如: TotW, Mod, Pos">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveDataObject()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据属性编辑弹窗 -->
+<div class="modal fade" id="dataAttrModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dataAttrModalTitle">新增数据属性</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="dataAttrForm">
+                    <input type="hidden" id="dataAttrOldName" value="">
+                    <input type="hidden" id="dataAttrParentPath" value="">
+                    <div class="mb-3">
+                        <label class="form-label">属性名称</label>
+                        <input type="text" class="form-control" id="dataAttrName" required placeholder="如: mag, stVal, f">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">数据类型</label>
+                            <select class="form-select" id="dataAttrType">
+                                <option value="">无 (容器节点)</option>
+                                <option value="FLOAT32">FLOAT32</option>
+                                <option value="INT32">INT32</option>
+                                <option value="INT64">INT64</option>
+                                <option value="BOOLEAN">BOOLEAN</option>
+                                <option value="VISIBLE_STRING_255">VISIBLE_STRING_255</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">功能约束 (FC)</label>
+                            <select class="form-select" id="dataAttrFC">
+                                <option value="">无</option>
+                                <option value="MX">MX - 测量值</option>
+                                <option value="ST">ST - 状态值</option>
+                                <option value="SP">SP - 设定值</option>
+                                <option value="CF">CF - 配置</option>
+                                <option value="DC">DC - 描述</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">触发条件</label>
+                        <select class="form-select" id="dataAttrTriggers">
+                            <option value="">无</option>
+                            <option value="DATA_CHANGED">DATA_CHANGED</option>
+                            <option value="QUALITY_CHANGED">QUALITY_CHANGED</option>
+                            <option value="DATA_UPDATE">DATA_UPDATE</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveDataAttribute()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 复制逻辑节点弹窗 -->
+<div class="modal fade" id="copyNodeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">复制逻辑节点</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="copyNodeForm">
+                    <input type="hidden" id="copySourceNode" value="">
+                    <div class="mb-3">
+                        <label class="form-label">源节点</label>
+                        <input type="text" class="form-control" id="copySourceDisplay" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">目标节点名称</label>
+                        <div id="copyTargetList">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control copy-target-name" placeholder="如: MMXU2">
+                                <button class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-success mt-1" onclick="addCopyTargetRow()">
+                            <i class="bi bi-plus"></i> 添加更多
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="executeCopyNode()">复制</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+// 全局状态
+var currentGroupId = '';
+var currentDeviceId = '';
+var currentGroupData = null;
+var currentRules = [];
+var editingGroupId = '';
+var editingIndex = -1;
+var allDevices = [];
+var allGroups = [];
+
+// IEC 61850 状态
+var iec61850Config = null;
+var iec61850Model = null;
+var iec61850Mappings = [];
+var iec61850Paths = [];
+var currentView = ''; // 'modbus' | 'iec61850_config' | 'iec61850_model' | 'iec61850_mapping'
+var modbusOutputEnabled = true; // Modbus 输出启用状态
+
+// 初始化页面
 async function initMappingPage() {
-    await loadDeviceSelect();
+    await loadAllDevices();
+    await loadGroupTree();
+    await loadModbusOutputStatus();
+    await loadIEC61850Data();
+    renderOutputTree();
 }
 
-async function loadDeviceSelect() {
+// 加载 Modbus 输出状态
+async function loadModbusOutputStatus() {
+    try {
+        const result = await api('GET', '/outputs');
+        if (result && result.code === 0) {
+            modbusOutputEnabled = result.data?.enabled !== false;
+        }
+    } catch (error) {
+        console.error('加载 Modbus 输出状态失败:', error);
+    }
+}
+
+// 加载所有设备
+async function loadAllDevices() {
     try {
         const result = await api('GET', '/devices');
         if (result && result.code === 0) {
-            const select = document.getElementById('deviceSelect');
-            select.innerHTML = '<option value="">选择设备</option>';
-            (result.data || []).forEach(device => {
-                select.innerHTML += `<option value="${device.id}">${device.name} (${device.id})</option>`;
-            });
-            select.addEventListener('change', loadMapping);
+            allDevices = result.data || [];
         }
     } catch (error) {
-        showToast('加载设备列表失败', 'danger');
+        console.error('加载设备列表失败:', error);
     }
 }
 
-async function loadMapping() {
-    const deviceId = document.getElementById('deviceSelect').value;
-    if (!deviceId) return;
-
+// 加载分组树
+async function loadGroupTree() {
     try {
-        const result = await api('GET', `/mappings/${deviceId}`);
+        const result = await api('GET', '/groups');
         if (result && result.code === 0) {
-            renderMappingTable(result.data?.points || []);
+            allGroups = result.data || [];
         }
     } catch (error) {
-        showToast('加载点表失败', 'danger');
+        showToast('加载分组列表失败', 'danger');
     }
 }
 
-function renderMappingTable(points) {
-    const tbody = document.getElementById('mappingTableBody');
-    if (points.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">暂无点表数据</td></tr>';
+// 加载 IEC 61850 数据
+async function loadIEC61850Data() {
+    try {
+        const [configRes, modelRes, mappingsRes, pathsRes] = await Promise.all([
+            api('GET', '/iec61850/config'),
+            api('GET', '/iec61850/model'),
+            api('GET', '/iec61850/mappings'),
+            api('GET', '/iec61850/paths')
+        ]);
+
+        if (configRes && configRes.code === 0) {
+            iec61850Config = configRes.data;
+        }
+        if (modelRes && modelRes.code === 0) {
+            iec61850Model = modelRes.data;
+        }
+        if (mappingsRes && mappingsRes.code === 0) {
+            iec61850Mappings = mappingsRes.data || [];
+        }
+        if (pathsRes && pathsRes.code === 0) {
+            iec61850Paths = pathsRes.data || [];
+        }
+    } catch (error) {
+        console.error('加载 IEC 61850 数据失败:', error);
+    }
+}
+
+// ===== 输出通道树 =====
+
+function renderOutputTree() {
+    const container = document.getElementById('outputChannelTree');
+    let html = '<div class="output-tree">';
+
+    // Modbus 输出
+    html += `
+        <div class="output-section mb-2">
+            <div class="section-header d-flex align-items-center p-2 bg-light rounded" style="cursor:pointer;" onclick="toggleSection('modbusSection')">
+                <i class="bi bi-chevron-down me-1" id="modbusSectionIcon"></i>
+                <i class="bi bi-ethernet me-2 text-primary"></i>
+                <strong>Modbus 输出</strong>
+                <div class="form-check form-switch ms-auto mb-0">
+                    <input class="form-check-input" type="checkbox" ${modbusOutputEnabled ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleModbusEnable(this.checked)">
+                </div>
+            </div>
+            <div class="section-body ms-3 mt-1" id="modbusSection">
+    `;
+
+    if (allGroups.length === 0) {
+        html += '<div class="text-muted small py-2">暂无分组</div>';
+    } else {
+        allGroups.forEach(group => {
+            const deviceCount = (group.devices || []).length;
+            const isExpanded = currentGroupId === group.id && currentView === 'modbus';
+            const isActive = currentGroupId === group.id && !currentDeviceId && currentView === 'modbus';
+
+            html += `
+                <div class="tree-item mb-1">
+                    <div class="d-flex align-items-center p-1 rounded ${isActive ? 'bg-primary bg-opacity-10' : ''}" style="cursor:pointer;" onclick="showGroupDetail('${group.id}')">
+                        <i class="bi bi-collection me-1 text-primary"></i>
+                        <span class="small ${isActive ? 'fw-bold text-primary' : ''}">${group.name}</span>
+                        <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">${deviceCount}</span>
+                    </div>
+                    <div class="ms-3 ${isExpanded ? '' : 'd-none'}" id="groupDevices_${group.id}">
+            `;
+
+            const groupDevices = getGroupDevices(group);
+            groupDevices.forEach(device => {
+                const isDeviceActive = currentDeviceId === device.id && currentView === 'modbus';
+                html += `
+                    <div class="d-flex align-items-center p-1 rounded ${isDeviceActive ? 'bg-primary bg-opacity-10' : ''}"
+                         style="cursor:pointer;" onclick="selectDevice('${group.id}', '${device.id}')">
+                        <i class="bi bi-hdd-rack me-1 text-info"></i>
+                        <span class="small ${isDeviceActive ? 'fw-bold text-primary' : ''}">${device.name}</span>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    // IEC 61850 输出
+    const iecEnabled = iec61850Config?.iec61850?.enabled || false;
+    html += `
+        <div class="output-section mb-2">
+            <div class="section-header d-flex align-items-center p-2 bg-light rounded" style="cursor:pointer;" onclick="toggleSection('iec61850Section')">
+                <i class="bi bi-chevron-down me-1" id="iec61850SectionIcon"></i>
+                <i class="bi bi-broadcast me-2 text-success"></i>
+                <strong>IEC 61850 输出</strong>
+                <div class="form-check form-switch ms-auto mb-0">
+                    <input class="form-check-input" type="checkbox" ${iecEnabled ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleIEC61850Enable(this.checked)">
+                </div>
+            </div>
+            <div class="section-body ms-3 mt-1" id="iec61850Section">
+                <div class="tree-item mb-1">
+                    <div class="d-flex align-items-center p-1 rounded ${currentView === 'iec61850_config' ? 'bg-primary bg-opacity-10' : ''}"
+                         style="cursor:pointer;" onclick="showIEC61850Config()">
+                        <i class="bi bi-gear me-1 text-warning"></i>
+                        <span class="small ${currentView === 'iec61850_config' ? 'fw-bold text-primary' : ''}">服务器配置</span>
+                    </div>
+                </div>
+                <div class="tree-item mb-1">
+                    <div class="d-flex align-items-center p-1 rounded ${currentView === 'iec61850_model' ? 'bg-primary bg-opacity-10' : ''}"
+                         style="cursor:pointer;" onclick="showIEC61850Model()">
+                        <i class="bi bi-diagram-2 me-1 text-info"></i>
+                        <span class="small ${currentView === 'iec61850_model' ? 'fw-bold text-primary' : ''}">数据模型</span>
+                    </div>
+                </div>
+                <div class="tree-item mb-1">
+                    <div class="d-flex align-items-center p-1 rounded ${currentView === 'iec61850_mapping' ? 'bg-primary bg-opacity-10' : ''}"
+                         style="cursor:pointer;" onclick="showIEC61850Mappings()">
+                        <i class="bi bi-arrow-left-right me-1 text-danger"></i>
+                        <span class="small ${currentView === 'iec61850_mapping' ? 'fw-bold text-primary' : ''}">映射规则</span>
+                        <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">${iec61850Mappings.length}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const icon = document.getElementById(sectionId + 'Icon');
+    if (section.classList.contains('d-none')) {
+        section.classList.remove('d-none');
+        icon.classList.replace('bi-chevron-right', 'bi-chevron-down');
+    } else {
+        section.classList.add('d-none');
+        icon.classList.replace('bi-chevron-down', 'bi-chevron-right');
+    }
+}
+
+// ===== Modbus 操作 (保持原有逻辑) =====
+
+function getGroupDevices(group) {
+    if (!group.devices || group.devices.length === 0) return [];
+    return allDevices.filter(d => group.devices.includes(d.id));
+}
+
+async function selectDevice(groupId, deviceId) {
+    currentGroupId = groupId;
+    currentDeviceId = deviceId;
+    currentView = 'modbus';
+    renderOutputTree();
+    await loadDeviceMapping(deviceId);
+}
+
+function showGroupDetail(groupId) {
+    currentGroupId = groupId;
+    currentDeviceId = '';
+    currentView = 'modbus';
+    renderOutputTree();
+    hideAllPanels();
+    document.getElementById('groupDetailPanel').style.display = 'block';
+
+    const group = allGroups.find(g => g.id === groupId);
+    if (group) {
+        currentGroupData = group;
+        document.getElementById('groupDetailTitle').textContent = group.name + ' - 输出配置';
+        document.getElementById('groupIdDisplay').textContent = group.id;
+        document.getElementById('groupTypeDisplay').innerHTML = `<span class="badge bg-${group.type === 'tcp' ? 'primary' : 'info'}">${group.type === 'tcp' ? 'TCP' : 'RTU'}</span>`;
+        document.getElementById('groupPortDisplay').textContent = group.type === 'tcp' ? `端口 ${group.port}` : group.port;
+        document.getElementById('groupSlaveIdDisplay').textContent = group.slave_id || 1;
+
+        if (group.type === 'tcp') {
+            document.getElementById('groupExtraInfo').style.display = 'flex';
+            document.getElementById('groupMaxConnDisplay').textContent = group.max_connections || 10;
+        } else {
+            document.getElementById('groupExtraInfo').style.display = 'none';
+        }
+        document.getElementById('groupDeviceCountDisplay').textContent = (group.devices || []).length;
+        renderGroupDevicesTable(group);
+    }
+}
+
+function renderGroupDevicesTable(group) {
+    const tbody = document.getElementById('groupDevicesTableBody');
+    const devices = getGroupDevices(group);
+
+    if (devices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无设备，请点击"添加设备"</td></tr>';
         return;
     }
 
-    tbody.innerHTML = points.map(point => `
+    tbody.innerHTML = devices.map(device => `
         <tr>
-            <td><code>${point.name}</code></td>
-            <td>${point.description || '-'}</td>
-            <td>${point.register}</td>
-            <td>${point.data_type}</td>
-            <td>${point.scale || 1}</td>
-            <td>${point.offset || 0}</td>
-            <td>${point.unit || '-'}</td>
+            <td><code>${device.id}</code></td>
+            <td>${device.name}</td>
+            <td><span class="badge bg-secondary">${device.protocol || 'modbus_tcp'}</span></td>
+            <td><span class="badge bg-${device.online ? 'success' : 'danger'}">${device.online ? '在线' : '离线'}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-primary btn-action" onclick="editPoint('${point.name}')">
-                    <i class="bi bi-pencil"></i>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="selectDevice('${group.id}', '${device.id}')">
+                    <i class="bi bi-table"></i> 映射
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeDeviceFromGroup('${group.id}', '${device.id}')">
+                    <i class="bi bi-trash"></i>
                 </button>
             </td>
         </tr>
     `).join('');
 }
 
-function exportMapping() {
-    showToast('导出功能开发中', 'warning');
+async function loadDeviceMapping(deviceId) {
+    hideAllPanels();
+    document.getElementById('deviceMappingPanel').style.display = 'block';
+
+    const device = allDevices.find(d => d.id === deviceId);
+    document.getElementById('deviceMappingTitle').textContent = `${device ? device.name : deviceId} - 映射点表`;
+
+    try {
+        const result = await api('GET', `/mappings/${deviceId}`);
+        if (result && result.code === 0) {
+            currentRules = result.data?.rules || [];
+            renderMappingTable(currentRules);
+        }
+    } catch (error) {
+        showToast('加载点表失败', 'danger');
+    }
 }
 
-function importMapping() {
-    showToast('导入功能开发中', 'warning');
+function getFunctionCodeText(sourceType) {
+    const codeMap = {'holding': '03', 'input': '04', 'coil': '01', 'discrete': '02'};
+    return codeMap[sourceType] || '03';
 }
 
-function editPoint(name) {
-    showToast('编辑点表功能开发中', 'warning');
+function renderMappingTable(rules) {
+    const tbody = document.getElementById('mappingTableBody');
+
+    if (rules.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">暂无点表数据，点击"新增数据点"添加</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = rules.map((rule, index) => `
+        <tr>
+            <td><code>${rule.name}</code></td>
+            <td><span class="badge bg-secondary">${getFunctionCodeText(rule.source_type || 'holding')}</span></td>
+            <td>${rule.source_register}</td>
+            <td>${rule.data_type}</td>
+            <td>${rule.target_register}</td>
+            <td>${rule.scale || 1}</td>
+            <td>${rule.offset || 0}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="editPoint(${index})">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-action" onclick="deletePoint(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// ===== Modbus 输出操作 =====
+
+async function toggleModbusEnable(enabled) {
+    try {
+        const result = await api('POST', '/outputs/toggle', { enabled: enabled });
+        if (result && result.code === 0) {
+            modbusOutputEnabled = enabled;
+            showToast(enabled ? 'Modbus 输出已启用' : 'Modbus 输出已禁用');
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+            // 回滚开关状态
+            renderOutputTree();
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+        renderOutputTree();
+    }
+}
+
+// ===== IEC 61850 操作 =====
+
+async function toggleIEC61850Enable(enabled) {
+    try {
+        const result = await api('PUT', '/iec61850/config', { enabled: enabled });
+        if (result && result.code === 0) {
+            showToast(enabled ? 'IEC 61850 已启用' : 'IEC 61850 已禁用');
+            await loadIEC61850Data();
+            renderOutputTree();
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+function hideAllPanels() {
+    document.getElementById('defaultHint').style.display = 'none';
+    document.getElementById('groupDetailPanel').style.display = 'none';
+    document.getElementById('deviceMappingPanel').style.display = 'none';
+    document.getElementById('iec61850ConfigPanel').style.display = 'none';
+    document.getElementById('iec61850ModelPanel').style.display = 'none';
+    document.getElementById('iec61850MappingPanel').style.display = 'none';
+}
+
+function showIEC61850Config() {
+    currentView = 'iec61850_config';
+    currentGroupId = '';
+    currentDeviceId = '';
+    hideAllPanels();
+    document.getElementById('iec61850ConfigPanel').style.display = 'block';
+    renderOutputTree();
+    refreshIEC61850ConfigDisplay();
+}
+
+function refreshIEC61850ConfigDisplay() {
+    const cfg = iec61850Config?.iec61850 || {};
+    document.getElementById('iec61850StatusDisplay').innerHTML = cfg.enabled ?
+        '<span class="text-success"><i class="bi bi-circle-fill"></i> 运行中</span>' :
+        '<span class="text-secondary"><i class="bi bi-circle-fill"></i> 已禁用</span>';
+    document.getElementById('iec61850PortDisplay').textContent = cfg.port || 102;
+    document.getElementById('iec61850IEDDisplay').textContent = cfg.ied_name || '-';
+    document.getElementById('iec61850MaxConnDisplay').textContent = cfg.max_connections || 10;
+    document.getElementById('iec61850MappingCountDisplay').textContent = iec61850Mappings.length;
+    document.getElementById('iec61850ICDDisplay').textContent = cfg.icd_output ? '已配置' : '未配置';
+}
+
+async function editIEC61850Config() {
+    const cfg = iec61850Config?.iec61850 || {};
+    document.getElementById('iec61850Enabled').checked = cfg.enabled || false;
+    document.getElementById('iec61850Port').value = cfg.port || 102;
+    document.getElementById('iec61850IEDName').value = cfg.ied_name || 'GRID_GATEWAY';
+    document.getElementById('iec61850MaxConn').value = cfg.max_connections || 10;
+    document.getElementById('iec61850ICDOutput').value = cfg.icd_output || './configs/GRID_GATEWAY.icd';
+    new bootstrap.Modal(document.getElementById('iec61850ConfigModal')).show();
+}
+
+async function saveIEC61850Config() {
+    const data = {
+        enabled: document.getElementById('iec61850Enabled').checked,
+        port: parseInt(document.getElementById('iec61850Port').value),
+        ied_name: document.getElementById('iec61850IEDName').value,
+        max_connections: parseInt(document.getElementById('iec61850MaxConn').value),
+        icd_output: document.getElementById('iec61850ICDOutput').value
+    };
+
+    try {
+        const result = await api('PUT', '/iec61850/config', data);
+        if (result && result.code === 0) {
+            showToast('保存成功');
+            bootstrap.Modal.getInstance(document.getElementById('iec61850ConfigModal')).hide();
+            await loadIEC61850Data();
+            refreshIEC61850ConfigDisplay();
+            renderOutputTree();
+        } else {
+            showToast(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function restartIEC61850() {
+    if (!await confirmAction('确定重启 IEC 61850 服务？')) return;
+    try {
+        const result = await api('POST', '/iec61850/restart');
+        if (result && result.code === 0) {
+            showToast('重启指令已发送');
+        } else {
+            showToast(result.message || '重启失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// ===== IEC 61850 数据模型 =====
+
+function showIEC61850Model() {
+    currentView = 'iec61850_model';
+    currentGroupId = '';
+    currentDeviceId = '';
+    hideAllPanels();
+    document.getElementById('iec61850ModelPanel').style.display = 'block';
+    renderOutputTree();
+    renderIEC61850ModelTree();
+}
+
+function renderIEC61850ModelTree() {
+    const container = document.getElementById('iec61850ModelTree');
+    const devices = iec61850Model?.logical_devices || [];
+
+    if (devices.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-3">暂无数据模型，点击"新增逻辑设备"添加</div>';
+        return;
+    }
+
+    let html = '';
+    devices.forEach(device => {
+        html += `
+            <div class="model-device mb-3 border rounded p-3">
+                <div class="mb-2">
+                    <i class="bi bi-collection me-1 text-primary"></i>
+                    <strong>逻辑设备: ${device.name}</strong>
+                    <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" style="font-size:0.7rem;" onclick="editLogicalDevice('${device.name}')" title="编辑">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteLogicalDevice('${device.name}')" title="删除">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <div class="ms-4">
+        `;
+
+        (device.logical_nodes || []).forEach(node => {
+            html += `
+                <div class="model-node mb-2 p-2 bg-light rounded">
+                    <div class="mb-2">
+                        <i class="bi bi-diagram-2 me-1 text-info"></i>
+                        <strong>${node.name}</strong>
+                        <button class="btn btn-sm btn-outline-success py-0 px-1 ms-2" style="font-size:0.7rem;" onclick="showCopyNode('${device.name}', '${node.name}')" title="复制">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.7rem;" onclick="editLogicalNode('${device.name}', '${node.name}')" title="编辑">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteLogicalNode('${device.name}', '${node.name}')" title="删除">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <div class="ms-4">
+            `;
+
+            (node.data_objects || []).forEach(obj => {
+                html += `
+                    <div class="model-object mb-2">
+                        <div class="mb-1">
+                            <i class="bi bi-cube me-1 text-warning"></i>
+                            <strong>${obj.name}</strong>
+                            <button class="btn btn-sm btn-outline-success py-0 px-1 ms-2" style="font-size:0.7rem;" onclick="showAddDataAttribute('${device.name}', '${node.name}', '${obj.name}')" title="新增属性">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.7rem;" onclick="editDataObject('${device.name}', '${node.name}', '${obj.name}')" title="编辑">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteDataObject('${device.name}', '${node.name}', '${obj.name}')" title="删除">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="ms-4">
+                `;
+                (obj.data_attributes || []).forEach(attr => {
+                    html += renderDataAttribute(attr, obj.name, device.name, node.name, obj.name);
+                });
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                        <button class="btn btn-sm btn-outline-success mt-2" onclick="showAddDataObject('${device.name}', '${node.name}')">
+                            <i class="bi bi-plus"></i> 新增数据对象
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                    <button class="btn btn-sm btn-outline-success mt-2" onclick="showAddLogicalNode('${device.name}')">
+                        <i class="bi bi-plus"></i> 新增逻辑节点
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function renderDataAttribute(attr, objectName, deviceName, nodeName, parentObjName, parentAttrPath) {
+    // 隐藏 q (QUALITY) 和 t (TIMESTAMP) 属性，它们会自动跟随父属性创建/删除
+    if ((attr.name === 'q' && attr.type === 'QUALITY') || (attr.name === 't' && attr.type === 'TIMESTAMP')) {
+        return '';
+    }
+
+    let html = '';
+    const currentPath = parentAttrPath ? parentAttrPath + '.' + attr.name : attr.name;
+
+    // 判断是否为容器节点：children 存在且不是 null（空数组 [] 也是容器节点）
+    const isContainer = Array.isArray(attr.children);
+
+    if (isContainer) {
+        html += `<div class="mb-1">`;
+        html += `<i class="bi bi-folder me-1 text-secondary"></i> ${attr.name}`;
+        if (attr.type) html += ` <span class="badge bg-info" style="font-size:0.6rem;">${attr.type}</span>`;
+        html += ` <button class="btn btn-sm btn-outline-success py-0 px-1" style="font-size:0.65rem;" onclick="showAddChildAttribute('${deviceName}', '${nodeName}', '${parentObjName}', '${currentPath}')" title="新增子属性"><i class="bi bi-plus"></i></button>`;
+        html += ` <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.65rem;" onclick="editDataAttribute('${deviceName}', '${nodeName}', '${parentObjName}', '${currentPath}')" title="编辑"><i class="bi bi-pencil"></i></button>`;
+        html += ` <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.65rem;" onclick="deleteDataAttribute('${deviceName}', '${nodeName}', '${parentObjName}', '${currentPath}')" title="删除"><i class="bi bi-trash"></i></button>`;
+        html += `</div>`;
+        html += '<div class="ms-3">';
+        attr.children.forEach(child => {
+            html += renderDataAttribute(child, objectName, deviceName, nodeName, parentObjName, currentPath);
+        });
+        html += '</div>';
+    } else {
+        html += `<div class="mb-1">`;
+        html += `<i class="bi bi-file-earmark me-1 text-success"></i> ${attr.name}`;
+        if (attr.type) html += ` <span class="badge bg-info" style="font-size:0.6rem;">${attr.type}</span>`;
+        if (attr.fc) html += ` <span class="badge bg-secondary" style="font-size:0.6rem;">${attr.fc}</span>`;
+        html += ` <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.65rem;" onclick="editDataAttribute('${deviceName}', '${nodeName}', '${parentObjName}', '${currentPath}')" title="编辑"><i class="bi bi-pencil"></i></button>`;
+        html += ` <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.65rem;" onclick="deleteDataAttribute('${deviceName}', '${nodeName}', '${parentObjName}', '${currentPath}')" title="删除"><i class="bi bi-trash"></i></button>`;
+        html += `</div>`;
+    }
+    return html;
+}
+
+function showAddLogicalDevice() {
+    document.getElementById('iec61850NodeModalTitle').textContent = '新增逻辑设备';
+    document.getElementById('nodeEditType').value = 'device';
+    document.getElementById('nodeEditOldName').value = '';
+    document.getElementById('nodeEditName').value = '';
+    document.getElementById('nodeChildrenEditor').style.display = 'block';
+    document.getElementById('nodeChildrenList').innerHTML = '';
+    addNodeChildRow();
+    new bootstrap.Modal(document.getElementById('iec61850NodeModal')).show();
+}
+
+function addNodeChildRow() {
+    const container = document.getElementById('nodeChildrenList');
+    const row = document.createElement('div');
+    row.className = 'input-group mb-2';
+    row.innerHTML = `
+        <input type="text" class="form-control form-control-sm node-child-name" placeholder="节点名称 (如: MMXU1)">
+        <button class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">
+            <i class="bi bi-trash"></i>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+function editLogicalDevice(name) {
+    const device = iec61850Model?.logical_devices?.find(d => d.name === name);
+    if (!device) return;
+
+    document.getElementById('iec61850NodeModalTitle').textContent = '编辑逻辑设备';
+    document.getElementById('nodeEditType').value = 'device';
+    document.getElementById('nodeEditOldName').value = name;
+    document.getElementById('nodeEditName').value = name;
+    document.getElementById('nodeChildrenEditor').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('iec61850NodeModal')).show();
+}
+
+async function deleteLogicalDevice(name) {
+    if (!await confirmAction(`确定删除逻辑设备 "${name}"？`)) return;
+    try {
+        const result = await api('DELETE', `/iec61850/model/devices/${name}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+function showAddLogicalNode(deviceName) {
+    document.getElementById('iec61850NodeModalTitle').textContent = '新增逻辑节点';
+    document.getElementById('nodeEditType').value = 'node';
+    document.getElementById('nodeEditOldName').value = '';
+    document.getElementById('nodeEditName').value = '';
+    document.getElementById('nodeChildrenEditor').style.display = 'none';
+    // 存储父设备名称
+    document.getElementById('iec61850NodeForm').dataset.deviceName = deviceName;
+    new bootstrap.Modal(document.getElementById('iec61850NodeModal')).show();
+}
+
+function editLogicalNode(deviceName, nodeName) {
+    document.getElementById('iec61850NodeModalTitle').textContent = '编辑逻辑节点';
+    document.getElementById('nodeEditType').value = 'node';
+    document.getElementById('nodeEditOldName').value = nodeName;
+    document.getElementById('nodeEditName').value = nodeName;
+    document.getElementById('nodeChildrenEditor').style.display = 'none';
+    document.getElementById('iec61850NodeForm').dataset.deviceName = deviceName;
+    new bootstrap.Modal(document.getElementById('iec61850NodeModal')).show();
+}
+
+async function deleteLogicalNode(deviceName, nodeName) {
+    if (!await confirmAction(`确定删除逻辑节点 "${nodeName}"？`)) return;
+    try {
+        const result = await api('DELETE', `/iec61850/model/devices/${deviceName}/nodes/${nodeName}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// ===== 复制逻辑节点 =====
+
+var copyDeviceName = '';
+var copySourceNode = '';
+
+function showCopyNode(deviceName, nodeName) {
+    copyDeviceName = deviceName;
+    copySourceNode = nodeName;
+    document.getElementById('copySourceDisplay').value = nodeName;
+    document.getElementById('copyTargetList').innerHTML = `
+        <div class="input-group mb-2">
+            <input type="text" class="form-control copy-target-name" placeholder="如: ${nodeName}2">
+            <button class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `;
+    new bootstrap.Modal(document.getElementById('copyNodeModal')).show();
+}
+
+function addCopyTargetRow() {
+    const container = document.getElementById('copyTargetList');
+    const row = document.createElement('div');
+    row.className = 'input-group mb-2';
+    row.innerHTML = `
+        <input type="text" class="form-control copy-target-name" placeholder="目标节点名称">
+        <button class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">
+            <i class="bi bi-trash"></i>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+async function executeCopyNode() {
+    const targetInputs = document.querySelectorAll('.copy-target-name');
+    const targetNames = [];
+    targetInputs.forEach(input => {
+        const name = input.value.trim();
+        if (name) targetNames.push(name);
+    });
+
+    if (targetNames.length === 0) {
+        showToast('请输入目标节点名称', 'warning');
+        return;
+    }
+
+    try {
+        const result = await api('POST', `/iec61850/model/devices/${copyDeviceName}/nodes/${copySourceNode}/copy`, {
+            target_names: targetNames
+        });
+        if (result && result.code === 0) {
+            showToast(result.message || '复制成功');
+            bootstrap.Modal.getInstance(document.getElementById('copyNodeModal')).hide();
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '复制失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// ===== 数据对象操作 =====
+
+// 存储当前编辑的上下文
+var currentEditContext = { device: '', node: '', object: '' };
+
+function showAddDataObject(deviceName, nodeName) {
+    currentEditContext = { device: deviceName, node: nodeName, object: '' };
+    document.getElementById('dataObjectModalTitle').textContent = '新增数据对象';
+    document.getElementById('dataObjectOldName').value = '';
+    document.getElementById('dataObjectName').value = '';
+    new bootstrap.Modal(document.getElementById('dataObjectModal')).show();
+}
+
+function editDataObject(deviceName, nodeName, objectName) {
+    currentEditContext = { device: deviceName, node: nodeName, object: objectName };
+    document.getElementById('dataObjectModalTitle').textContent = '编辑数据对象';
+    document.getElementById('dataObjectOldName').value = objectName;
+    document.getElementById('dataObjectName').value = objectName;
+    new bootstrap.Modal(document.getElementById('dataObjectModal')).show();
+}
+
+async function saveDataObject() {
+    const name = document.getElementById('dataObjectName').value.trim();
+    const oldName = document.getElementById('dataObjectOldName').value;
+
+    if (!name) {
+        showToast('请输入数据对象名称', 'warning');
+        return;
+    }
+
+    const isEdit = oldName !== '';
+    const data = { name: name, data_attributes: [] };
+
+    if (isEdit) {
+        // 如果是编辑，保留原有属性
+        const device = iec61850Model?.logical_devices?.find(d => d.name === currentEditContext.device);
+        const node = device?.logical_nodes?.find(n => n.name === currentEditContext.node);
+        const obj = node?.data_objects?.find(o => o.name === oldName);
+        if (obj) {
+            data.data_attributes = obj.data_attributes || [];
+        }
+    } else {
+        // 如果是新建，自动添加 q (品质) 和 t (时标) 属性
+        data.data_attributes = [
+            {
+                name: "q",
+                type: "QUALITY",
+                fc: "MX",
+                triggers: "QUALITY_CHANGED",
+                children: null
+            },
+            {
+                name: "t",
+                type: "TIMESTAMP",
+                fc: "MX",
+                triggers: "DATA_CHANGED",
+                children: null
+            }
+        ];
+    }
+
+    try {
+        let result;
+        if (isEdit) {
+            result = await api('PUT', `/iec61850/model/devices/${currentEditContext.device}/nodes/${currentEditContext.node}/objects/${oldName}`, data);
+        } else {
+            result = await api('POST', `/iec61850/model/devices/${currentEditContext.device}/nodes/${currentEditContext.node}/objects`, data);
+        }
+
+        if (result && result.code === 0) {
+            showToast(isEdit ? '更新成功' : '创建成功');
+            bootstrap.Modal.getInstance(document.getElementById('dataObjectModal')).hide();
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function deleteDataObject(deviceName, nodeName, objectName) {
+    if (!await confirmAction(`确定删除数据对象 "${objectName}"？`)) return;
+    try {
+        const result = await api('DELETE', `/iec61850/model/devices/${deviceName}/nodes/${nodeName}/objects/${objectName}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// ===== 数据属性操作 =====
+
+function showAddDataAttribute(deviceName, nodeName, objectName) {
+    currentEditContext = { device: deviceName, node: nodeName, object: objectName };
+    document.getElementById('dataAttrModalTitle').textContent = '新增数据属性';
+    document.getElementById('dataAttrOldName').value = '';
+    document.getElementById('dataAttrParentPath').value = '';
+    document.getElementById('dataAttrName').value = '';
+    document.getElementById('dataAttrType').value = '';
+    document.getElementById('dataAttrFC').value = '';
+    document.getElementById('dataAttrTriggers').value = '';
+    new bootstrap.Modal(document.getElementById('dataAttrModal')).show();
+}
+
+function showAddChildAttribute(deviceName, nodeName, objectName, parentPath) {
+    currentEditContext = { device: deviceName, node: nodeName, object: objectName };
+    document.getElementById('dataAttrModalTitle').textContent = '新增子属性';
+    document.getElementById('dataAttrOldName').value = '';
+    document.getElementById('dataAttrParentPath').value = parentPath;
+    document.getElementById('dataAttrName').value = '';
+    document.getElementById('dataAttrType').value = '';
+    document.getElementById('dataAttrFC').value = '';
+    document.getElementById('dataAttrTriggers').value = '';
+    new bootstrap.Modal(document.getElementById('dataAttrModal')).show();
+}
+
+function editDataAttribute(deviceName, nodeName, objectName, attrPath) {
+    currentEditContext = { device: deviceName, node: nodeName, object: objectName };
+
+    // 查找属性数据
+    const device = iec61850Model?.logical_devices?.find(d => d.name === deviceName);
+    const node = device?.logical_nodes?.find(n => n.name === nodeName);
+    const obj = node?.data_objects?.find(o => o.name === objectName);
+
+    // 解析路径找到属性
+    const pathParts = attrPath.split('.');
+    let attr = null;
+    let parentPath = '';
+
+    function findAttr(attrs, parts, depth) {
+        for (let a of attrs) {
+            if (a.name === parts[depth]) {
+                if (depth === parts.length - 1) {
+                    attr = a;
+                    return true;
+                }
+                if (a.children) {
+                    return findAttr(a.children, parts, depth + 1);
+                }
+            }
+        }
+        return false;
+    }
+
+    if (obj?.data_attributes) {
+        findAttr(obj.data_attributes, pathParts, 0);
+    }
+
+    const oldName = pathParts[pathParts.length - 1];
+    parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('.') : '';
+
+    document.getElementById('dataAttrModalTitle').textContent = '编辑数据属性';
+    document.getElementById('dataAttrOldName').value = attrPath;
+    document.getElementById('dataAttrParentPath').value = parentPath;
+    document.getElementById('dataAttrName').value = attr?.name || oldName;
+    document.getElementById('dataAttrType').value = attr?.type || '';
+    document.getElementById('dataAttrFC').value = attr?.fc || '';
+    document.getElementById('dataAttrTriggers').value = attr?.triggers || '';
+    new bootstrap.Modal(document.getElementById('dataAttrModal')).show();
+}
+
+async function saveDataAttribute() {
+    const name = document.getElementById('dataAttrName').value.trim();
+    const oldPath = document.getElementById('dataAttrOldName').value;
+    const parentPath = document.getElementById('dataAttrParentPath').value;
+    const attrType = document.getElementById('dataAttrType').value;
+
+    if (!name) {
+        showToast('请输入属性名称', 'warning');
+        return;
+    }
+
+    const data = {
+        name: name,
+        type: attrType,
+        fc: document.getElementById('dataAttrFC').value,
+        triggers: document.getElementById('dataAttrTriggers').value,
+        children: attrType === '' ? [] : null,  // 容器节点用空数组，叶子节点用 null
+        parent_path: parentPath // 传递父路径给后端
+    };
+
+    const isEdit = oldPath !== '';
+    if (isEdit) {
+        const device = iec61850Model?.logical_devices?.find(d => d.name === currentEditContext.device);
+        const node = device?.logical_nodes?.find(n => n.name === currentEditContext.node);
+        const obj = node?.data_objects?.find(o => o.name === currentEditContext.object);
+
+        function findAndCopyChildren(attrs, parts, depth) {
+            for (let a of attrs) {
+                if (a.name === parts[depth]) {
+                    if (depth === parts.length - 1) {
+                        return a.children || null;
+                    }
+                    if (a.children) {
+                        return findAndCopyChildren(a.children, parts, depth + 1);
+                    }
+                }
+            }
+            return null;
+        }
+
+        if (obj?.data_attributes) {
+            data.children = findAndCopyChildren(obj.data_attributes, oldPath.split('.'), 0);
+        }
+    }
+
+    try {
+        let result;
+        if (isEdit) {
+            result = await api('PUT', `/iec61850/model/devices/${currentEditContext.device}/nodes/${currentEditContext.node}/objects/${currentEditContext.object}/attrs/${oldPath}`, data);
+        } else {
+            result = await api('POST', `/iec61850/model/devices/${currentEditContext.device}/nodes/${currentEditContext.node}/objects/${currentEditContext.object}/attrs`, data);
+        }
+
+        if (result && result.code === 0) {
+            showToast(isEdit ? '更新成功' : '创建成功');
+            bootstrap.Modal.getInstance(document.getElementById('dataAttrModal')).hide();
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function deleteDataAttribute(deviceName, nodeName, objectName, attrPath) {
+    if (!await confirmAction(`确定删除数据属性？`)) return;
+    try {
+        const result = await api('DELETE', `/iec61850/model/devices/${deviceName}/nodes/${nodeName}/objects/${objectName}/attrs/${attrPath}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            await loadIEC61850Data();
+            renderIEC61850ModelTree();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function saveNodeEdit() {
+    const editType = document.getElementById('nodeEditType').value;
+    const name = document.getElementById('nodeEditName').value.trim();
+    const oldName = document.getElementById('nodeEditOldName').value;
+
+    if (!name) {
+        showToast('请输入名称', 'warning');
+        return;
+    }
+
+    if (editType === 'device') {
+        const isEdit = oldName !== '';
+        const data = { name: name, logical_nodes: [] };
+
+        if (!isEdit) {
+            // 收集子节点
+            const childInputs = document.querySelectorAll('.node-child-name');
+            childInputs.forEach(input => {
+                const nodeName = input.value.trim();
+                if (nodeName) {
+                    data.logical_nodes.push({ name: nodeName, data_objects: [] });
+                }
+            });
+
+            try {
+                const result = await api('POST', '/iec61850/model/devices', data);
+                if (result && result.code === 0) {
+                    showToast('创建成功');
+                    bootstrap.Modal.getInstance(document.getElementById('iec61850NodeModal')).hide();
+                    await loadIEC61850Data();
+                    renderIEC61850ModelTree();
+                } else {
+                    showToast(result.message || '创建失败', 'danger');
+                }
+            } catch (error) {
+                showToast('网络错误', 'danger');
+            }
+        } else {
+            // 编辑 - 保留原有节点
+            const device = iec61850Model?.logical_devices?.find(d => d.name === oldName);
+            if (device) {
+                data.logical_nodes = device.logical_nodes || [];
+            }
+            try {
+                const result = await api('PUT', `/iec61850/model/devices/${oldName}`, data);
+                if (result && result.code === 0) {
+                    showToast('更新成功');
+                    bootstrap.Modal.getInstance(document.getElementById('iec61850NodeModal')).hide();
+                    await loadIEC61850Data();
+                    renderIEC61850ModelTree();
+                } else {
+                    showToast(result.message || '更新失败', 'danger');
+                }
+            } catch (error) {
+                showToast('网络错误', 'danger');
+            }
+        }
+    } else if (editType === 'node') {
+        const deviceName = document.getElementById('iec61850NodeForm').dataset.deviceName;
+        const isEdit = oldName !== '';
+        const data = { name: name, data_objects: [] };
+
+        if (isEdit) {
+            const device = iec61850Model?.logical_devices?.find(d => d.name === deviceName);
+            const node = device?.logical_nodes?.find(n => n.name === oldName);
+            if (node) {
+                data.data_objects = node.data_objects || [];
+            }
+            try {
+                const result = await api('PUT', `/iec61850/model/devices/${deviceName}/nodes/${oldName}`, data);
+                if (result && result.code === 0) {
+                    showToast('更新成功');
+                    bootstrap.Modal.getInstance(document.getElementById('iec61850NodeModal')).hide();
+                    await loadIEC61850Data();
+                    renderIEC61850ModelTree();
+                } else {
+                    showToast(result.message || '更新失败', 'danger');
+                }
+            } catch (error) {
+                showToast('网络错误', 'danger');
+            }
+        } else {
+            try {
+                const result = await api('POST', `/iec61850/model/devices/${deviceName}/nodes`, data);
+                if (result && result.code === 0) {
+                    showToast('创建成功');
+                    bootstrap.Modal.getInstance(document.getElementById('iec61850NodeModal')).hide();
+                    await loadIEC61850Data();
+                    renderIEC61850ModelTree();
+                } else {
+                    showToast(result.message || '创建失败', 'danger');
+                }
+            } catch (error) {
+                showToast('网络错误', 'danger');
+            }
+        }
+    }
+}
+
+// ===== IEC 61850 映射规则 =====
+
+function showIEC61850Mappings() {
+    currentView = 'iec61850_mapping';
+    currentGroupId = '';
+    currentDeviceId = '';
+    hideAllPanels();
+    document.getElementById('iec61850MappingPanel').style.display = 'block';
+    renderOutputTree();
+    renderIEC61850MappingTable();
+    updateDeviceFilter();
+}
+
+function updateDeviceFilter() {
+    const select = document.getElementById('iec61850DeviceFilter');
+    const devices = [...new Set(iec61850Mappings.map(m => m.source_device))];
+    select.innerHTML = '<option value="">全部设备</option>';
+    devices.forEach(d => {
+        const device = allDevices.find(dev => dev.id === d);
+        select.innerHTML += `<option value="${d}">${device ? device.name : d}</option>`;
+    });
+}
+
+function filterIEC61850Mappings() {
+    renderIEC61850MappingTable();
+}
+
+function renderIEC61850MappingTable() {
+    const tbody = document.getElementById('iec61850MappingTableBody');
+    const filter = document.getElementById('iec61850DeviceFilter')?.value || '';
+
+    let mappings = iec61850Mappings;
+    if (filter) {
+        mappings = mappings.filter(m => m.source_device === filter);
+    }
+
+    if (mappings.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">暂无映射规则，点击"新增映射"添加</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = mappings.map((rule, index) => {
+        const originalIndex = iec61850Mappings.indexOf(rule);
+        const device = allDevices.find(d => d.id === rule.source_device);
+        return `
+            <tr>
+                <td>${device ? device.name : rule.source_device}</td>
+                <td>${rule.source_name || '-'}</td>
+                <td>${rule.source_register}</td>
+                <td><code class="small">${rule.iec61850_path}</code></td>
+                <td>${rule.data_type || '-'}</td>
+                <td>${rule.scale || 1}</td>
+                <td>${rule.offset || 0}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="editIEC61850Mapping(${originalIndex})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteIEC61850Mapping(${originalIndex})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showAddIEC61850Mapping() {
+    document.getElementById('iec61850MappingModalTitle').textContent = '新增 IEC 61850 映射规则';
+    document.getElementById('iec61850MappingForm').reset();
+    document.getElementById('iec_scale').value = '1.0';
+    document.getElementById('iec_offset').value = '0.0';
+
+    // 填充源设备下拉
+    const deviceSelect = document.getElementById('iec_source_device');
+    deviceSelect.innerHTML = '<option value="">选择设备</option>';
+    allDevices.forEach(d => {
+        deviceSelect.innerHTML += `<option value="${d.id}">${d.name} (${d.id})</option>`;
+    });
+
+    // 填充 IEC 61850 路径（仅显示 f 叶子节点，排除已使用的路径）
+    const usedPaths = new Set(iec61850Mappings.map(m => m.iec61850_path));
+    const pathSelect = document.getElementById('iec_path');
+    pathSelect.innerHTML = '<option value="">选择路径</option>';
+    iec61850Paths.filter(p => p.endsWith('.f') && !usedPaths.has(p)).forEach(p => {
+        pathSelect.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+
+    editingIndex = -1;
+    new bootstrap.Modal(document.getElementById('iec61850MappingModal')).show();
+}
+
+function editIEC61850Mapping(index) {
+    if (index < 0 || index >= iec61850Mappings.length) return;
+
+    const rule = iec61850Mappings[index];
+    document.getElementById('iec61850MappingModalTitle').textContent = '编辑 IEC 61850 映射规则';
+
+    // 填充源设备下拉
+    const deviceSelect = document.getElementById('iec_source_device');
+    deviceSelect.innerHTML = '<option value="">选择设备</option>';
+    allDevices.forEach(d => {
+        deviceSelect.innerHTML += `<option value="${d.id}" ${d.id === rule.source_device ? 'selected' : ''}>${d.name} (${d.id})</option>`;
+    });
+
+    document.getElementById('iec_source_name').value = rule.source_name || '';
+    document.getElementById('iec_source_register').value = rule.source_register || 0;
+    document.getElementById('iec_source_type').value = rule.source_type || 'holding';
+    document.getElementById('iec_data_type').value = rule.data_type || 'uint16';
+    document.getElementById('iec_target_type').value = rule.target_type || 'float32';
+
+    // 填充 IEC 61850 路径（仅显示 f 叶子节点，排除已使用的路径，保留当前编辑的）
+    const usedPaths = new Set(iec61850Mappings.map(m => m.iec61850_path));
+    const pathSelect = document.getElementById('iec_path');
+    pathSelect.innerHTML = '<option value="">选择路径</option>';
+    iec61850Paths.filter(p => p.endsWith('.f') && (p === rule.iec61850_path || !usedPaths.has(p))).forEach(p => {
+        pathSelect.innerHTML += `<option value="${p}" ${p === rule.iec61850_path ? 'selected' : ''}>${p}</option>`;
+    });
+
+    document.getElementById('iec_scale').value = rule.scale || 1.0;
+    document.getElementById('iec_offset').value = rule.offset || 0.0;
+
+    editingIndex = index;
+    new bootstrap.Modal(document.getElementById('iec61850MappingModal')).show();
+}
+
+function onIECSourceDeviceChange() {
+    // 可以根据选中的设备加载该设备的数据点列表
+}
+
+async function saveIEC61850Mapping() {
+    const data = {
+        source_device: document.getElementById('iec_source_device').value,
+        source_name: document.getElementById('iec_source_name').value,
+        source_register: parseInt(document.getElementById('iec_source_register').value) || 0,
+        source_type: document.getElementById('iec_source_type').value,
+        data_type: document.getElementById('iec_data_type').value,
+        target_type: document.getElementById('iec_target_type').value,
+        iec61850_path: document.getElementById('iec_path').value,
+        scale: parseFloat(document.getElementById('iec_scale').value) || 1.0,
+        offset: parseFloat(document.getElementById('iec_offset').value) || 0.0
+    };
+
+    if (!data.source_device) {
+        showToast('请选择源设备', 'warning');
+        return;
+    }
+    if (!data.iec61850_path) {
+        showToast('请选择 IEC 61850 路径', 'warning');
+        return;
+    }
+
+    try {
+        let result;
+        if (editingIndex >= 0) {
+            result = await api('PUT', `/iec61850/mappings/${editingIndex}`, data);
+        } else {
+            result = await api('POST', '/iec61850/mappings', data);
+        }
+
+        if (result && result.code === 0) {
+            showToast(editingIndex >= 0 ? '更新成功' : '创建成功');
+            bootstrap.Modal.getInstance(document.getElementById('iec61850MappingModal')).hide();
+            await loadIEC61850Data();
+            renderIEC61850MappingTable();
+            updateDeviceFilter();
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function deleteIEC61850Mapping(index) {
+    if (index < 0 || index >= iec61850Mappings.length) return;
+    if (!await confirmAction('确定删除该映射规则？')) return;
+
+    try {
+        const result = await api('DELETE', `/iec61850/mappings/${index}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            await loadIEC61850Data();
+            renderIEC61850MappingTable();
+            updateDeviceFilter();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// ===== Modbus 分组操作 (保持原有逻辑) =====
+
+async function showAddGroup() {
+    document.getElementById('groupModalTitle').textContent = '新增分组';
+    document.getElementById('groupForm').reset();
+    document.getElementById('groupId').disabled = false;
+    document.getElementById('groupType').value = 'tcp';
+    document.getElementById('groupType').disabled = false;
+    document.getElementById('groupPort').value = 502;
+    document.getElementById('groupSlaveId').value = 1;
+    document.getElementById('groupMaxConn').value = 10;
+    editingGroupId = '';
+    await loadSerialPortsForGroup();
+    toggleGroupFields();
+    new bootstrap.Modal(document.getElementById('groupModal')).show();
+}
+
+async function editCurrentGroup() {
+    if (!currentGroupId || !currentGroupData) return;
+    await editGroup(currentGroupId);
+}
+
+async function editGroup(id) {
+    try {
+        const result = await api('GET', `/groups/${id}`);
+        if (!result || result.code !== 0) {
+            showToast('获取分组信息失败', 'danger');
+            return;
+        }
+        const group = result.data;
+        document.getElementById('groupModalTitle').textContent = '编辑分组';
+        document.getElementById('groupId').value = group.id;
+        document.getElementById('groupId').disabled = true;
+        document.getElementById('groupName').value = group.name;
+        document.getElementById('groupType').value = group.type || 'tcp';
+        document.getElementById('groupType').disabled = true;
+        document.getElementById('groupSlaveId').value = group.slave_id || 1;
+
+        if (group.type === 'tcp') {
+            document.getElementById('groupPort').value = group.port || 502;
+            document.getElementById('groupMaxConn').value = group.max_connections || 10;
+        } else {
+            await loadSerialPortsForGroup();
+            document.getElementById('groupSerialPort').value = group.port || '';
+            document.getElementById('groupBaudRate').value = group.baud_rate || 9600;
+        }
+        editingGroupId = id;
+        toggleGroupFields();
+        new bootstrap.Modal(document.getElementById('groupModal')).show();
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function deleteCurrentGroup() {
+    if (!currentGroupId) return;
+    await deleteGroup(currentGroupId);
+}
+
+async function deleteGroup(id) {
+    if (!await confirmAction(`确定删除分组 ${id}？`)) return;
+    try {
+        const result = await api('DELETE', `/groups/${id}`);
+        if (result && result.code === 0) {
+            showToast('删除成功');
+            if (currentGroupId === id) {
+                currentGroupId = '';
+                currentDeviceId = '';
+                hideAllPanels();
+                document.getElementById('defaultHint').style.display = 'block';
+            }
+            await loadGroupTree();
+            renderOutputTree();
+        } else {
+            showToast(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function saveGroup() {
+    const type = document.getElementById('groupType').value;
+    const data = {
+        id: document.getElementById('groupId').value,
+        name: document.getElementById('groupName').value,
+        type: type,
+        slave_id: parseInt(document.getElementById('groupSlaveId').value),
+    };
+
+    if (!data.id || !data.name) {
+        showToast('请填写ID和名称', 'warning');
+        return;
+    }
+
+    if (type === 'tcp') {
+        data.port = parseInt(document.getElementById('groupPort').value);
+        data.max_connections = parseInt(document.getElementById('groupMaxConn').value);
+    } else {
+        data.port = document.getElementById('groupSerialPort').value;
+        data.baud_rate = parseInt(document.getElementById('groupBaudRate').value);
+        if (!data.port) {
+            showToast('请选择串口', 'warning');
+            return;
+        }
+    }
+
+    if (editingGroupId) {
+        const existingGroup = allGroups.find(g => g.id === editingGroupId);
+        if (existingGroup) {
+            data.devices = existingGroup.devices || [];
+        }
+    } else {
+        data.devices = [];
+    }
+
+    try {
+        const isEdit = editingGroupId !== '';
+        const url = isEdit ? `/groups/${editingGroupId}` : '/groups';
+        const result = await api(isEdit ? 'PUT' : 'POST', url, data);
+        if (result && result.code === 0) {
+            showToast(isEdit ? '更新成功' : '创建成功');
+            bootstrap.Modal.getInstance(document.getElementById('groupModal')).hide();
+            await loadGroupTree();
+            renderOutputTree();
+            if (isEdit && currentGroupId === editingGroupId) {
+                showGroupDetail(editingGroupId);
+            }
+        } else {
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+function toggleGroupFields() {
+    const type = document.getElementById('groupType').value;
+    document.getElementById('groupTcpFields').style.display = type === 'tcp' ? 'block' : 'none';
+    document.getElementById('groupRtuFields').style.display = type === 'rtu' ? 'block' : 'none';
+    document.getElementById('groupMaxConnField').style.display = type === 'tcp' ? 'block' : 'none';
+}
+
+async function loadSerialPortsForGroup() {
+    try {
+        const result = await api('GET', '/system/serial-ports');
+        if (result && result.code === 0) {
+            const select = document.getElementById('groupSerialPort');
+            select.innerHTML = '';
+            (result.data || []).forEach(port => {
+                const option = document.createElement('option');
+                option.value = port.name;
+                option.textContent = port.name;
+                if (port.used) {
+                    option.textContent += ` (${port.used_by} 已占用)`;
+                    option.disabled = true;
+                }
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载串口列表失败:', error);
+    }
+}
+
+// ===== 设备操作 =====
+
+function showAddDeviceToGroup() {
+    if (!currentGroupId) return;
+    const group = allGroups.find(g => g.id === currentGroupId);
+    if (!group) return;
+
+    const select = document.getElementById('availableDevices');
+    select.innerHTML = '';
+    const existingDeviceIds = group.devices || [];
+    const availableDevices = allDevices.filter(d => !existingDeviceIds.includes(d.id));
+
+    if (availableDevices.length === 0) {
+        select.innerHTML = '<option value="" disabled>没有可用设备</option>';
+    } else {
+        availableDevices.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.id;
+            option.textContent = `${device.name} (${device.id})`;
+            select.appendChild(option);
+        });
+    }
+    new bootstrap.Modal(document.getElementById('addDeviceModal')).show();
+}
+
+async function addDevicesToGroup() {
+    const select = document.getElementById('availableDevices');
+    const selectedDeviceIds = Array.from(select.selectedOptions).map(opt => opt.value).filter(v => v);
+
+    if (selectedDeviceIds.length === 0) {
+        showToast('请选择要添加的设备', 'warning');
+        return;
+    }
+
+    const group = allGroups.find(g => g.id === currentGroupId);
+    if (!group) return;
+
+    const updatedDevices = [...new Set([...(group.devices || []), ...selectedDeviceIds])];
+
+    try {
+        const result = await api('PUT', `/groups/${currentGroupId}`, { ...group, devices: updatedDevices });
+        if (result && result.code === 0) {
+            showToast('添加成功');
+            bootstrap.Modal.getInstance(document.getElementById('addDeviceModal')).hide();
+            await loadGroupTree();
+            renderOutputTree();
+            if (document.getElementById('groupDetailPanel').style.display !== 'none') {
+                showGroupDetail(currentGroupId);
+            }
+        } else {
+            showToast(result.message || '添加失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+async function removeDeviceFromGroup(groupId, deviceId) {
+    if (!await confirmAction('确定从分组中移除该设备？')) return;
+
+    const group = allGroups.find(g => g.id === groupId);
+    if (!group) return;
+
+    const updatedDevices = (group.devices || []).filter(id => id !== deviceId);
+
+    try {
+        const result = await api('PUT', `/groups/${groupId}`, { ...group, devices: updatedDevices });
+        if (result && result.code === 0) {
+            showToast('移除成功');
+            await loadGroupTree();
+            renderOutputTree();
+            if (currentGroupId === groupId) {
+                if (currentDeviceId === deviceId) {
+                    currentDeviceId = '';
+                    hideAllPanels();
+                    document.getElementById('defaultHint').style.display = 'block';
+                }
+                if (document.getElementById('groupDetailPanel').style.display !== 'none') {
+                    showGroupDetail(groupId);
+                }
+            }
+        } else {
+            showToast(result.message || '移除失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// ===== 映射点表操作 =====
+
+function showAddPoint() {
+    if (!currentDeviceId) {
+        showToast('请先选择设备', 'warning');
+        return;
+    }
+
+    document.getElementById('pointModalTitle').textContent = '新增数据点';
+    document.getElementById('pointForm').reset();
+    document.getElementById('sourceType').value = 'holding';
+    document.getElementById('sourceRegister').value = 0;
+    document.getElementById('dataType').value = 'uint16';
+    document.getElementById('registerCount').value = 1;
+    document.getElementById('scale').value = 1;
+    document.getElementById('offset').value = 0;
+    document.getElementById('highLimit').value = 0;
+    document.getElementById('lowLimit').value = 0;
+
+    let maxTargetReg = -1;
+    currentRules.forEach(rule => {
+        if (rule.target_register > maxTargetReg) {
+            maxTargetReg = rule.target_register;
+        }
+    });
+    document.getElementById('targetRegister').value = maxTargetReg + 1;
+    document.getElementById('pointName').value = `数据点${currentRules.length + 1}`;
+
+    editingIndex = -1;
+    new bootstrap.Modal(document.getElementById('pointModal')).show();
+}
+
+function editPoint(index) {
+    if (index < 0 || index >= currentRules.length) return;
+
+    const rule = currentRules[index];
+    document.getElementById('pointModalTitle').textContent = '编辑数据点';
+    document.getElementById('pointName').value = rule.name || '';
+    document.getElementById('sourceType').value = rule.source_type || 'holding';
+    document.getElementById('sourceRegister').value = rule.source_register || 0;
+    document.getElementById('dataType').value = rule.data_type || 'uint16';
+    document.getElementById('registerCount').value = rule.register_count || 1;
+    document.getElementById('targetRegister').value = rule.target_register || 0;
+    document.getElementById('scale').value = rule.scale || 1;
+    document.getElementById('offset').value = rule.offset || 0;
+    document.getElementById('unit').value = rule.unit || '';
+    document.getElementById('highLimit').value = rule.high_limit || 0;
+    document.getElementById('lowLimit').value = rule.low_limit || 0;
+    editingIndex = index;
+    new bootstrap.Modal(document.getElementById('pointModal')).show();
+}
+
+async function savePoint() {
+    const point = {
+        name: document.getElementById('pointName').value,
+        source_type: document.getElementById('sourceType').value,
+        source_register: parseInt(document.getElementById('sourceRegister').value),
+        data_type: document.getElementById('dataType').value,
+        register_count: parseInt(document.getElementById('registerCount').value),
+        target_register: parseInt(document.getElementById('targetRegister').value),
+        scale: parseFloat(document.getElementById('scale').value),
+        offset: parseFloat(document.getElementById('offset').value),
+        unit: document.getElementById('unit').value,
+        high_limit: parseFloat(document.getElementById('highLimit').value) || 0,
+        low_limit: parseFloat(document.getElementById('lowLimit').value) || 0,
+    };
+
+    if (!point.name) {
+        showToast('请输入数据点名称', 'warning');
+        return;
+    }
+
+    if (editingIndex >= 0) {
+        currentRules[editingIndex] = point;
+    } else {
+        currentRules.push(point);
+    }
+    await saveMapping();
+}
+
+async function deletePoint(index) {
+    if (index < 0 || index >= currentRules.length) return;
+    if (!await confirmAction('确定删除该数据点？')) return;
+
+    currentRules.splice(index, 1);
+    await saveMapping();
+}
+
+async function saveMapping() {
+    try {
+        const groupId = currentGroupId || 'default';
+        const result = await api('PUT', `/mappings/${currentDeviceId}`, {
+            rules: currentRules,
+            group_id: groupId
+        });
+        if (result && result.code === 0) {
+            showToast('保存成功');
+            bootstrap.Modal.getInstance(document.getElementById('pointModal'))?.hide();
+            await loadDeviceMapping(currentDeviceId);
+        } else {
+            showToast(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 }
 </script>

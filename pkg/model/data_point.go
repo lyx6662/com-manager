@@ -4,12 +4,13 @@ import "time"
 
 // DataPoint 通用数据点
 type DataPoint struct {
-	DeviceID  string      `json:"device_id"`  // 设备唯一标识
-	Name      string      `json:"name"`       // 数据点名称
-	Value     interface{} `json:"value"`      // 值
-	Quality   Quality     `json:"quality"`    // 数据质量
-	Timestamp time.Time   `json:"timestamp"`  // 时间戳
-	DataType  DataType    `json:"data_type"`  // 数据类型
+	DeviceID  string                 `json:"device_id"`  // 设备唯一标识
+	Name      string                 `json:"name"`       // 数据点名称
+	Value     interface{}            `json:"value"`      // 值
+	Quality   Quality                `json:"quality"`    // 数据质量
+	Timestamp time.Time              `json:"timestamp"`  // 时间戳
+	DataType  DataType               `json:"data_type"`  // 数据类型
+	Extra     map[string]interface{} `json:"extra,omitempty"` // 扩展字段
 }
 
 // Quality 数据质量

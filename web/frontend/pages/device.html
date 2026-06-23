@@ -57,18 +57,20 @@
                     <div class="mb-3">
                         <label class="form-label">协议</label>
                         <select class="form-select" id="deviceProtocol">
-                            <option value="modbus-rtu">Modbus RTU</option>
-                            <option value="modbus-tcp">Modbus TCP</option>
-                            <option value="iec61850-mms">IEC 61850 MMS</option>
+                            <option value="modbus_rtu">Modbus RTU</option>
+                            <option value="modbus_tcp">Modbus TCP</option>
+                            <option value="iec61850">IEC 61850</option>
                         </select>
                     </div>
                     <div id="serialFields">
                         <div class="mb-3">
                             <label class="form-label">串口号</label>
-                            <input type="text" class="form-control" id="serialPort" placeholder="/dev/ttyUSB0 或 COM3">
+                            <select class="form-select" id="serialPort">
+                                <option value="">加载中...</option>
+                            </select>
                         </div>
                         <div class="row">
-                            <div class="col-6 mb-3">
+                            <div class="col-4 mb-3">
                                 <label class="form-label">波特率</label>
                                 <select class="form-select" id="baudRate">
                                     <option value="9600">9600</option>
@@ -77,9 +79,33 @@
                                     <option value="115200">115200</option>
                                 </select>
                             </div>
-                            <div class="col-6 mb-3">
+                            <div class="col-4 mb-3">
                                 <label class="form-label">从站地址</label>
                                 <input type="number" class="form-control" id="slaveId" value="1" min="1" max="247">
+                            </div>
+                            <div class="col-4 mb-3">
+                                <label class="form-label">数据位</label>
+                                <select class="form-select" id="dataBits">
+                                    <option value="7">7</option>
+                                    <option value="8" selected>8</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">停止位</label>
+                                <select class="form-select" id="stopBits">
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                </select>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">校验位</label>
+                                <select class="form-select" id="parity">
+                                    <option value="none" selected>无 (None)</option>
+                                    <option value="even">偶校验 (Even)</option>
+                                    <option value="odd">奇校验 (Odd)</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -93,6 +119,10 @@
                                 <label class="form-label">端口</label>
                                 <input type="number" class="form-control" id="netPort" value="502">
                             </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">从站地址 (Slave ID)</label>
+                            <input type="number" class="form-control" id="netSlaveId" value="1" min="0" max="247">
                         </div>
                     </div>
                     <div class="row">
@@ -120,10 +150,62 @@
 </div>
 
 <script>
-let devices = [];
+var devices = [];
+var serialPorts = [];
+
+// 生成设备ID
+function generateDeviceId(type) {
+    const prefix = type === 'serial' ? 'serial' : 'network';
+    const existingIds = devices.map(d => d.id);
+    let counter = 1;
+    while (existingIds.includes(`${prefix}-${counter}`)) {
+        counter++;
+    }
+    return `${prefix}-${counter}`;
+}
 
 async function initDevicePage() {
     await loadDevices();
+}
+
+// 加载串口列表
+async function loadSerialPorts() {
+    try {
+        const result = await api('GET', '/system/serial-ports');
+        if (result && result.code === 0) {
+            serialPorts = result.data || [];
+        }
+    } catch (error) {
+        console.error('加载串口列表失败:', error);
+        serialPorts = [];
+    }
+}
+
+// 填充串口下拉框
+function populateSerialPortSelect(currentPort) {
+    const select = document.getElementById('serialPort');
+    select.innerHTML = '';
+
+    if (serialPorts.length === 0) {
+        select.innerHTML = '<option value="">未检测到串口</option>';
+        return;
+    }
+
+    serialPorts.forEach(port => {
+        const option = document.createElement('option');
+        option.value = port.name;
+        option.textContent = port.name;
+        if (port.used) {
+            option.textContent += ` (${port.used_by} 已占用)`;
+            option.disabled = true;
+            option.style.color = '#999';
+        }
+        if (port.name === currentPort) {
+            option.selected = true;
+            option.disabled = false; // 当前使用的端口可以选择
+        }
+        select.appendChild(option);
+    });
 }
 
 async function loadDevices() {
@@ -164,15 +246,29 @@ function renderDeviceTable() {
     `).join('');
 }
 
-function showAddDevice() {
+async function showAddDevice() {
     document.getElementById('deviceModalTitle').textContent = '新增设备';
     document.getElementById('deviceForm').reset();
-    document.getElementById('deviceId').disabled = false;
+
+    // 自动生成设备ID
+    const type = document.getElementById('deviceType').value;
+    document.getElementById('deviceId').value = generateDeviceId(type);
+    document.getElementById('deviceId').disabled = true;
+
+    // 设置默认值
+    document.getElementById('pollInterval').value = '5s';
+    document.getElementById('timeout').value = '3s';
+    document.getElementById('deviceEnabled').checked = true;
+
+    // 加载串口列表
+    await loadSerialPorts();
+    populateSerialPortSelect('');
+
     toggleConnectionFields();
     new bootstrap.Modal(document.getElementById('deviceModal')).show();
 }
 
-function editDevice(id) {
+async function editDevice(id) {
     const device = devices.find(d => d.id === id);
     if (!device) return;
 
@@ -181,8 +277,33 @@ function editDevice(id) {
     document.getElementById('deviceId').disabled = true;
     document.getElementById('deviceName').value = device.name;
     document.getElementById('deviceType').value = device.type;
-    document.getElementById('deviceProtocol').value = device.protocol;
+
+    // 填充协议字段
+    const protocolSelect = document.getElementById('deviceProtocol');
+    protocolSelect.value = device.protocol || 'modbus_rtu';
+
     document.getElementById('deviceEnabled').checked = device.enabled;
+    document.getElementById('pollInterval').value = device.poll_interval || '5s';
+    document.getElementById('timeout').value = device.timeout || '3s';
+
+    // 加载串口列表并填充串口设备字段
+    if (device.type === 'serial') {
+        await loadSerialPorts();
+        populateSerialPortSelect(device.port || '');
+        document.getElementById('baudRate').value = device.baud_rate || 9600;
+        document.getElementById('slaveId').value = device.slave_id || 1;
+        document.getElementById('dataBits').value = device.data_bits || 8;
+        document.getElementById('stopBits').value = device.stop_bits || 1;
+        document.getElementById('parity').value = device.parity || 'none';
+    }
+
+    // 填充网口设备字段
+    if (device.type === 'network') {
+        document.getElementById('host').value = device.host || '';
+        document.getElementById('netPort').value = device.port || 502;
+        document.getElementById('netSlaveId').value = device.slave_id != null ? device.slave_id : 1;
+    }
+
     toggleConnectionFields();
     new bootstrap.Modal(document.getElementById('deviceModal')).show();
 }
@@ -191,6 +312,11 @@ function toggleConnectionFields() {
     const type = document.getElementById('deviceType').value;
     document.getElementById('serialFields').style.display = type === 'serial' ? 'block' : 'none';
     document.getElementById('networkFields').style.display = type === 'network' ? 'block' : 'none';
+
+    // 新增模式下，切换类型时自动更新ID
+    if (!document.getElementById('deviceId').disabled || document.getElementById('deviceModalTitle').textContent === '新增设备') {
+        document.getElementById('deviceId').value = generateDeviceId(type);
+    }
 }
 
 async function saveDevice() {
@@ -208,14 +334,19 @@ async function saveDevice() {
         data.port = document.getElementById('serialPort').value;
         data.baud_rate = parseInt(document.getElementById('baudRate').value);
         data.slave_id = parseInt(document.getElementById('slaveId').value);
+        data.data_bits = parseInt(document.getElementById('dataBits').value);
+        data.stop_bits = parseInt(document.getElementById('stopBits').value);
+        data.parity = document.getElementById('parity').value;
     } else {
         data.host = document.getElementById('host').value;
         data.net_port = parseInt(document.getElementById('netPort').value);
+        data.slave_id = parseInt(document.getElementById('netSlaveId').value);
     }
 
     try {
         const isEdit = document.getElementById('deviceId').disabled;
-        const result = await api(isEdit ? 'PUT' : 'POST', `/devices/${data.id}`, data);
+        const url = isEdit ? `/devices/${data.id}` : '/devices';
+        const result = await api(isEdit ? 'PUT' : 'POST', url, data);
         if (result && result.code === 0) {
             showToast(isEdit ? '更新成功' : '创建成功');
             bootstrap.Modal.getInstance(document.getElementById('deviceModal')).hide();

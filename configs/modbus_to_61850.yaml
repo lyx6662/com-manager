@@ -1,0 +1,544 @@
+iec61850:
+    enabled: true
+    port: 102
+    ied_name: GW
+    max_connections: 10
+    icd_output: ./configs/GW.icd
+model:
+    logical_devices:
+        - name: WG
+          logical_nodes:
+            - name: MMXU1
+              data_objects:
+                - name: TotW0
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW1
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW2
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW3
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW4
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW5
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+            - name: MMXU2
+              data_objects:
+                - name: TotW0
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW1
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW2
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW3
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW4
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+            - name: MMXU3
+              data_objects:
+                - name: TotW0
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW1
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW2
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW3
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW4
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+            - name: MMXU4
+              data_objects:
+                - name: TotW0
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW1
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW2
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW3
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+                - name: TotW4
+                  data_attributes:
+                    - name: q
+                      type: QUALITY
+                      fc: MX
+                      triggers: QUALITY_CHANGED
+                    - name: t
+                      type: TIMESTAMP
+                      fc: MX
+                      triggers: DATA_CHANGED
+                    - name: mag
+                      children:
+                        - name: f
+                          type: FLOAT32
+                          fc: MX
+                          triggers: DATA_CHANGED
+mappings:
+    - source_device: rtu-device-1
+      source_name: ""
+      source_register: 0
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU1.TotW0.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-1
+      source_name: ""
+      source_register: 1
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU1.TotW1.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-1
+      source_name: ""
+      source_register: 2
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU1.TotW2.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-1
+      source_name: ""
+      source_register: 3
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU1.TotW3.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-1
+      source_name: ""
+      source_register: 4
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU1.TotW4.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-2
+      source_name: ""
+      source_register: 0
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU2.TotW0.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-2
+      source_name: ""
+      source_register: 1
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU2.TotW1.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-2
+      source_name: ""
+      source_register: 2
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU2.TotW2.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-2
+      source_name: ""
+      source_register: 3
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU2.TotW3.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-2
+      source_name: ""
+      source_register: 4
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU2.TotW4.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-device-1
+      source_name: ""
+      source_register: 0
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU3.TotW0.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-device-1
+      source_name: ""
+      source_register: 1
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU3.TotW1.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-device-1
+      source_name: ""
+      source_register: 2
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU3.TotW2.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-device-1
+      source_name: ""
+      source_register: 3
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU3.TotW3.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-device-1
+      source_name: ""
+      source_register: 4
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU3.TotW4.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-2
+      source_name: ""
+      source_register: 0
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU4.TotW0.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-2
+      source_name: ""
+      source_register: 1
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU4.TotW1.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-2
+      source_name: ""
+      source_register: 2
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU4.TotW2.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-2
+      source_name: ""
+      source_register: 3
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU4.TotW3.mag.f
+      scale: 1
+      offset: 0
+    - source_device: tcp-2
+      source_name: ""
+      source_register: 4
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU4.TotW4.mag.f
+      scale: 1
+      offset: 0
+    - source_device: rtu-device-1
+      source_name: ""
+      source_register: 5
+      source_type: holding
+      data_type: uint16
+      target_type: float32
+      iec61850_path: WG/MMXU1.TotW5.mag.f
+      scale: 1
+      offset: 0

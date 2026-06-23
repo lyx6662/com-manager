@@ -10,12 +10,13 @@ import (
 
 // Config 通讯管理机主配置
 type Config struct {
-	Server         ServerConfig         `yaml:"server"`
-	Web            WebConfig            `yaml:"web"`
-	SerialDevices  []SerialDeviceConfig `yaml:"serial_devices"`
-	NetworkDevices []NetworkDeviceConfig `yaml:"network_devices"`
-	Outputs        OutputConfig         `yaml:"outputs"`
-	OfflineBuffer  OfflineBufferConfig  `yaml:"offline_buffer"`
+	Server         ServerConfig             `yaml:"server"`
+	Web            WebConfig                `yaml:"web"`
+	SerialDevices  []SerialDeviceConfig     `yaml:"serial_devices"`
+	NetworkDevices []NetworkDeviceConfig    `yaml:"network_devices"`
+	Outputs        OutputConfig             `yaml:"outputs"`
+	Mappings       map[string][]MappingRule `yaml:"mappings"` // key为设备ID，value为该设备的点表规则
+	OfflineBuffer  OfflineBufferConfig      `yaml:"offline_buffer"`
 }
 
 // ServerConfig 服务器配置
@@ -83,26 +84,28 @@ type NetworkDeviceConfig struct {
 
 // OutputConfig 输出配置
 type OutputConfig struct {
-	ModbusTCPServers []ModbusTCPServerConfig `yaml:"modbus_tcp_servers"`
-	ModbusRTUServers []ModbusRTUServerConfig `yaml:"modbus_rtu_servers"`
+	Enabled        bool                    `yaml:"enabled" json:"enabled"`                // 是否启用 Modbus 输出
+	ModbusTCPServers []ModbusTCPServerConfig `yaml:"modbus_tcp_servers" json:"modbus_tcp_servers"`
+	ModbusRTUServers []ModbusRTUServerConfig `yaml:"modbus_rtu_servers" json:"modbus_rtu_servers"`
+	GroupDevices     map[string][]string     `yaml:"group_devices" json:"group_devices"` // 分组包含的设备ID列表
 }
 
 // ModbusTCPServerConfig Modbus TCP输出配置
 type ModbusTCPServerConfig struct {
-	ID             string `yaml:"id"`
-	Name           string `yaml:"name"`
-	ListenPort     int    `yaml:"listen_port"`
-	SlaveID        int    `yaml:"slave_id"`
-	MaxConnections int    `yaml:"max_connections"`
+	ID             string `yaml:"id" json:"id"`
+	Name           string `yaml:"name" json:"name"`
+	ListenPort     int    `yaml:"listen_port" json:"listen_port"`
+	SlaveID        int    `yaml:"slave_id" json:"slave_id"`
+	MaxConnections int    `yaml:"max_connections" json:"max_connections"`
 }
 
 // ModbusRTUServerConfig Modbus RTU输出配置
 type ModbusRTUServerConfig struct {
-	ID       string `yaml:"id"`
-	Name     string `yaml:"name"`
-	Port     string `yaml:"port"`
-	BaudRate int    `yaml:"baud_rate"`
-	SlaveID  int    `yaml:"slave_id"`
+	ID       string `yaml:"id" json:"id"`
+	Name     string `yaml:"name" json:"name"`
+	Port     string `yaml:"port" json:"port"`
+	BaudRate int    `yaml:"baud_rate" json:"baud_rate"`
+	SlaveID  int    `yaml:"slave_id" json:"slave_id"`
 }
 
 // OfflineBufferConfig 断点续传配置
@@ -132,10 +135,30 @@ type GroupOverride struct {
 	PriorityMode  string `yaml:"priority_mode"`
 }
 
+// MappingRule 点表映射规则
+type MappingRule struct {
+	Name            string  `yaml:"name" json:"name"`                         // 数据点名称
+	SourceDevice    string  `yaml:"source_device" json:"source_device"`       // 源设备ID
+	SourceRegister  uint16  `yaml:"source_register" json:"source_register"`   // 源寄存器地址
+	SourceType      string  `yaml:"source_type" json:"source_type"`           // 源寄存器类型: holding/input/coil
+	DataType        string  `yaml:"data_type" json:"data_type"`               // 数据类型: uint16/int16/float32/bool
+	RegisterCount   int     `yaml:"register_count" json:"register_count"`     // 占用寄存器数量 (float32=2, 其他=1)
+	TargetRegister  uint16  `yaml:"target_register" json:"target_register"`   // 目标输出寄存器地址
+	Scale           float64 `yaml:"scale" json:"scale"`                       // 缩放系数
+	Offset          float64 `yaml:"offset" json:"offset"`                     // 偏移量
+	Unit            string  `yaml:"unit" json:"unit"`                         // 单位 (仅用于显示)
+	MaxPoints       int     `yaml:"max_points" json:"max_points"`             // 批量读取时最大数据点数 (0=不限制)
+	HighLimit       float64 `yaml:"high_limit" json:"high_limit"`             // 报警上限 (0=不启用)
+	LowLimit        float64 `yaml:"low_limit" json:"low_limit"`               // 报警下限 (0=不启用)
+	ByteOrder       string  `yaml:"byte_order" json:"byte_order"`             // 32位浮点字节序: ABCD(大端)/BADC(字交换)/CDAB(字节交换)/DCBA(小端)，默认ABCD
+}
+
 // Manager 配置管理器
 type Manager struct {
-	path string
-	cfg  *Config
+	path         string
+	cfg          *Config
+	iec61850Path string
+	iec61850Cfg  *ModbusToIEC61850Config
 }
 
 // NewManager 创建配置管理器
@@ -144,7 +167,32 @@ func NewManager(path string) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{path: path, cfg: cfg}, nil
+
+	m := &Manager{path: path, cfg: cfg}
+
+	// 尝试加载 IEC 61850 配置文件
+	iec61850Path := "./configs/modbus_to_61850.yaml"
+	iec61850Cfg, err := LoadModbusToIEC61850(iec61850Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "[WARN] IEC 61850 配置文件不存在: %s，将自动生成默认配置\n", iec61850Path)
+			if genErr := GenerateDefaultIEC61850Config(iec61850Path); genErr != nil {
+				fmt.Fprintf(os.Stderr, "[ERROR] 自动生成 IEC 61850 默认配置失败: %v\n", genErr)
+			} else {
+				// 重新加载生成的默认配置
+				iec61850Cfg, _ = LoadModbusToIEC61850(iec61850Path)
+				m.iec61850Path = iec61850Path
+				m.iec61850Cfg = iec61850Cfg
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[WARN] 加载 IEC 61850 配置失败: %v\n", err)
+		}
+	} else {
+		m.iec61850Path = iec61850Path
+		m.iec61850Cfg = iec61850Cfg
+	}
+
+	return m, nil
 }
 
 // Get 获取配置
@@ -316,7 +364,88 @@ func (m *Manager) DeleteModbusTCPServer(id string) error {
 	return fmt.Errorf("输出配置不存在: %s", id)
 }
 
+// GetModbusRTUServer 获取Modbus RTU输出配置
+func (m *Manager) GetModbusRTUServer(id string) *ModbusRTUServerConfig {
+	for i := range m.cfg.Outputs.ModbusRTUServers {
+		if m.cfg.Outputs.ModbusRTUServers[i].ID == id {
+			return &m.cfg.Outputs.ModbusRTUServers[i]
+		}
+	}
+	return nil
+}
+
+// AddModbusRTUServer 添加Modbus RTU输出配置
+func (m *Manager) AddModbusRTUServer(srv ModbusRTUServerConfig) error {
+	if m.GetModbusRTUServer(srv.ID) != nil {
+		return fmt.Errorf("输出配置已存在: %s", srv.ID)
+	}
+	m.cfg.Outputs.ModbusRTUServers = append(m.cfg.Outputs.ModbusRTUServers, srv)
+	return m.Save()
+}
+
+// UpdateModbusRTUServer 更新Modbus RTU输出配置
+func (m *Manager) UpdateModbusRTUServer(srv ModbusRTUServerConfig) error {
+	for i := range m.cfg.Outputs.ModbusRTUServers {
+		if m.cfg.Outputs.ModbusRTUServers[i].ID == srv.ID {
+			m.cfg.Outputs.ModbusRTUServers[i] = srv
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("输出配置不存在: %s", srv.ID)
+}
+
+// DeleteModbusRTUServer 删除Modbus RTU输出配置
+func (m *Manager) DeleteModbusRTUServer(id string) error {
+	for i := range m.cfg.Outputs.ModbusRTUServers {
+		if m.cfg.Outputs.ModbusRTUServers[i].ID == id {
+			m.cfg.Outputs.ModbusRTUServers = append(m.cfg.Outputs.ModbusRTUServers[:i], m.cfg.Outputs.ModbusRTUServers[i+1:]...)
+			return m.Save()
+		}
+	}
+	return fmt.Errorf("输出配置不存在: %s", id)
+}
+
+// SetOutputs 批量设置所有输出配置
+func (m *Manager) SetOutputs(tcpServers []ModbusTCPServerConfig, rtuServers []ModbusRTUServerConfig) error {
+	m.cfg.Outputs.ModbusTCPServers = tcpServers
+	m.cfg.Outputs.ModbusRTUServers = rtuServers
+	return m.Save()
+}
+
+// GetGroupDevices 获取分组包含的设备列表
+func (m *Manager) GetGroupDevices(groupID string) []string {
+	if m.cfg.Outputs.GroupDevices == nil {
+		return nil
+	}
+	return m.cfg.Outputs.GroupDevices[groupID]
+}
+
+// SetGroupDevices 设置分组包含的设备列表
+func (m *Manager) SetGroupDevices(groupID string, deviceIDs []string) error {
+	if m.cfg.Outputs.GroupDevices == nil {
+		m.cfg.Outputs.GroupDevices = make(map[string][]string)
+	}
+	m.cfg.Outputs.GroupDevices[groupID] = deviceIDs
+	return m.Save()
+}
+
 func setDefaults(cfg *Config) {
+	// 串口设备默认值
+	for i := range cfg.SerialDevices {
+		if cfg.SerialDevices[i].DataBits == 0 {
+			cfg.SerialDevices[i].DataBits = 8
+		}
+		if cfg.SerialDevices[i].StopBits == 0 {
+			cfg.SerialDevices[i].StopBits = 1
+		}
+		if cfg.SerialDevices[i].Parity == "" {
+			cfg.SerialDevices[i].Parity = "none"
+		}
+		if cfg.SerialDevices[i].Retry <= 0 {
+			cfg.SerialDevices[i].Retry = 3
+		}
+	}
+
 	if cfg.Server.LogLevel == "" {
 		cfg.Server.LogLevel = "info"
 	}
@@ -342,7 +471,7 @@ func setDefaults(cfg *Config) {
 		cfg.OfflineBuffer.MemoryQueueSize = 10000
 	}
 	if cfg.OfflineBuffer.FlushInterval == "" {
-		cfg.OfflineBuffer.FlushInterval = "1s"
+		cfg.OfflineBuffer.FlushInterval = "10m"
 	}
 	if cfg.OfflineBuffer.ReportStrategy.BatchSize == 0 {
 		cfg.OfflineBuffer.ReportStrategy.BatchSize = 100
@@ -392,4 +521,107 @@ func (d *NetworkDeviceConfig) GetTimeoutDuration() time.Duration {
 		return 3 * time.Second
 	}
 	return duration
+}
+
+// GetRegisterCount 获取映射规则占用的寄存器数量
+func (r *MappingRule) GetRegisterCount() int {
+	if r.RegisterCount > 0 {
+		return r.RegisterCount
+	}
+	switch r.DataType {
+	case "float32", "int32", "uint32":
+		return 2
+	default:
+		return 1
+	}
+}
+
+// GetMappingRules 获取指定设备的映射规则
+func (m *Manager) GetMappingRules(deviceID string) []MappingRule {
+	if m.cfg.Mappings == nil {
+		return nil
+	}
+	return m.cfg.Mappings[deviceID]
+}
+
+// SetMappingRules 设置指定设备的映射规则
+func (m *Manager) SetMappingRules(deviceID string, rules []MappingRule) error {
+	if m.cfg.Mappings == nil {
+		m.cfg.Mappings = make(map[string][]MappingRule)
+	}
+	m.cfg.Mappings[deviceID] = rules
+	return m.Save()
+}
+
+// GetAllMappings 获取所有映射配置
+func (m *Manager) GetAllMappings() map[string][]MappingRule {
+	return m.cfg.Mappings
+}
+
+// GetDeviceGroupID 获取设备所属的分组ID
+func (m *Manager) GetDeviceGroupID(deviceID string) string {
+	for groupID, devices := range m.cfg.Outputs.GroupDevices {
+		for _, devID := range devices {
+			if devID == deviceID {
+				return groupID
+			}
+		}
+	}
+	return ""
+}
+
+// GetDeviceByID 根据ID查找设备 (串口或网口)
+func (m *Manager) GetDeviceByID(id string) interface{} {
+	if dev := m.GetSerialDevice(id); dev != nil {
+		return dev
+	}
+	return m.GetNetworkDevice(id)
+}
+
+// === IEC 61850 配置管理方法 ===
+
+// GetIEC61850Config 获取 IEC 61850 配置
+func (m *Manager) GetIEC61850Config() *ModbusToIEC61850Config {
+	return m.iec61850Cfg
+}
+
+// IsIEC61850Enabled 检查 IEC 61850 功能是否启用
+func (m *Manager) IsIEC61850Enabled() bool {
+	return m.iec61850Cfg != nil && m.iec61850Cfg.IEC61850.Enabled
+}
+
+// SetIEC61850Config 设置 IEC 61850 配置
+func (m *Manager) SetIEC61850Config(cfg *ModbusToIEC61850Config) error {
+	m.iec61850Cfg = cfg
+	return m.SaveIEC61850()
+}
+
+// ValidateIEC61850Mappings 校验 IEC 61850 映射路径是否在模型中存在
+func (m *Manager) ValidateIEC61850Mappings(cfg *ModbusToIEC61850Config) error {
+	return validateModelPaths(cfg)
+}
+
+// SaveIEC61850 保存 IEC 61850 配置到文件
+func (m *Manager) SaveIEC61850() error {
+	if m.iec61850Path == "" {
+		m.iec61850Path = "./configs/modbus_to_61850.yaml"
+	}
+	return SaveModbusToIEC61850(m.iec61850Path, m.iec61850Cfg)
+}
+
+// GetIEC61850Mappings 获取 IEC 61850 映射规则
+func (m *Manager) GetIEC61850Mappings() []IEC61850MappingRule {
+	if m.iec61850Cfg == nil {
+		return nil
+	}
+	return m.iec61850Cfg.Mappings
+}
+
+// SetIEC61850Mappings 设置 IEC 61850 映射规则
+func (m *Manager) SetIEC61850Mappings(rules []IEC61850MappingRule) error {
+	if m.iec61850Cfg == nil {
+		return fmt.Errorf("IEC 61850 配置未加载")
+	}
+	m.iec61850Cfg.Mappings = rules
+	return m.SaveIEC61850()
 }

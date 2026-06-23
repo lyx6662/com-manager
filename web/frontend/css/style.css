@@ -107,3 +107,35 @@ body {
     right: 20px;
     z-index: 9999;
 }
+
+/* 输出通道树 */
+.output-tree .section-header {
+    transition: background-color 0.2s;
+}
+
+.output-tree .section-header:hover {
+    background-color: #e9ecef;
+}
+
+.output-tree .tree-item {
+    font-size: 0.9rem;
+}
+
+.output-tree .tree-item:hover > div {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* IEC 61850 数据模型树 */
+.model-device {
+    background-color: #fff;
+}
+
+.model-node {
+    border-left: 3px solid #0d6efd;
+}
+
+/* 表格中的代码样式 */
+.table code {
+    font-size: 0.85em;
+    color: #d63384;
+}

@@ -29,6 +29,21 @@ configs/gateway.yaml
 com-manager
 com-manager-*
 
+# 编译产物目录
+build/
+
+# 调试和临时文件
+*.pcap
+qtsql_cache_debug.json
+com-manager~
+
+# Playwright MCP
+.playwright-mcp/
+
+# 安装包
+*.zip
+installer.iss
+
 # 系统文件
 .DS_Store
 Thumbs.db

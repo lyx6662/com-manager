@@ -8,17 +8,29 @@ import (
 	"github.com/lyx6662/com-manager/pkg/logger"
 )
 
+// CollectorProvider 采集器数据提供者接口
+type CollectorProvider interface {
+	GetDeviceStatus(deviceID string) interface{}
+	GetAllDeviceStatus() map[string]interface{}
+}
+
 // DeviceHandler 设备管理处理器
 type DeviceHandler struct {
-	cfgMgr *config.Manager
-	log    *logger.Logger
+	cfgMgr    *config.Manager
+	log       *logger.Logger
+	collector CollectorProvider
 }
 
 // NewDeviceHandler 创建设备处理器
-func NewDeviceHandler(cfgMgr *config.Manager, log *logger.Logger) *DeviceHandler {
+func NewDeviceHandler(cfgMgr *config.Manager, log *logger.Logger, collector interface{}) *DeviceHandler {
+	var cp CollectorProvider
+	if c, ok := collector.(CollectorProvider); ok {
+		cp = c
+	}
 	return &DeviceHandler{
-		cfgMgr: cfgMgr,
-		log:    log,
+		cfgMgr:    cfgMgr,
+		log:       log,
+		collector: cp,
 	}
 }
 
@@ -33,10 +45,16 @@ type DeviceResponse struct {
 	Host         string `json:"host,omitempty"`
 	Port         interface{} `json:"port,omitempty"`
 	BaudRate     int    `json:"baud_rate,omitempty"`
+	DataBits     int    `json:"data_bits,omitempty"`
+	StopBits     int    `json:"stop_bits,omitempty"`
+	Parity       string `json:"parity,omitempty"`
 	SlaveID      int    `json:"slave_id"`
 	PollInterval string `json:"poll_interval"`
 	Timeout      string `json:"timeout"`
 	Retry        int    `json:"retry"`
+	LastPoll     interface{} `json:"last_poll"`
+	ErrorCount   int    `json:"error_count"`
+	LastError    string `json:"last_error,omitempty"`
 }
 
 // CreateDeviceRequest 创建设备请求
@@ -59,41 +77,86 @@ type CreateDeviceRequest struct {
 	Enabled      bool   `json:"enabled"`
 }
 
+// deviceStatusInfo 设备状态信息
+type deviceStatusInfo struct {
+	online     bool
+	lastPoll   interface{}
+	errorCount int
+	lastError  string
+}
+
 // List 获取设备列表
 func (h *DeviceHandler) List(c *gin.Context) {
 	devices := make([]DeviceResponse, 0)
 
+	// 获取采集器中的设备状态
+	deviceStatuses := make(map[string]deviceStatusInfo)
+	if h.collector != nil {
+		statuses := h.collector.GetAllDeviceStatus()
+		for id, s := range statuses {
+			info := deviceStatusInfo{}
+			if status, ok := s.(interface{ IsOnline() bool }); ok {
+				info.online = status.IsOnline()
+			}
+			// 尝试获取更多状态字段
+			if status, ok := s.(interface {
+				IsOnline() bool
+				GetLastPoll() interface{}
+				GetErrorCount() int
+				GetLastError() string
+			}); ok {
+				info.lastPoll = status.GetLastPoll()
+				info.errorCount = status.GetErrorCount()
+				info.lastError = status.GetLastError()
+			}
+			deviceStatuses[id] = info
+		}
+	}
+
 	// 串口设备
 	for _, dev := range h.cfgMgr.Get().SerialDevices {
+		status := deviceStatuses[dev.ID]
 		devices = append(devices, DeviceResponse{
 			ID:           dev.ID,
 			Name:         dev.Name,
 			Type:         "serial",
 			Protocol:     dev.Protocol,
 			Enabled:      dev.Enabled,
+			Online:       status.online,
 			Port:         dev.Port,
 			BaudRate:     dev.BaudRate,
+			DataBits:     dev.DataBits,
+			StopBits:     dev.StopBits,
+			Parity:       dev.Parity,
 			SlaveID:      dev.SlaveID,
 			PollInterval: dev.PollInterval,
 			Timeout:      dev.Timeout,
 			Retry:        dev.Retry,
+			LastPoll:     status.lastPoll,
+			ErrorCount:   status.errorCount,
+			LastError:    status.lastError,
 		})
 	}
 
 	// 网口设备
 	for _, dev := range h.cfgMgr.Get().NetworkDevices {
+		status := deviceStatuses[dev.ID]
 		devices = append(devices, DeviceResponse{
 			ID:           dev.ID,
 			Name:         dev.Name,
 			Type:         "network",
 			Protocol:     dev.Protocol,
 			Enabled:      dev.Enabled,
+			Online:       status.online,
 			Host:         dev.Host,
 			Port:         dev.Port,
 			SlaveID:      dev.SlaveID,
 			PollInterval: dev.PollInterval,
 			Timeout:      dev.Timeout,
 			Retry:        dev.Retry,
+			LastPoll:     status.lastPoll,
+			ErrorCount:   status.errorCount,
+			LastError:    status.lastError,
 		})
 	}
 
@@ -120,6 +183,9 @@ func (h *DeviceHandler) Get(c *gin.Context) {
 				Enabled:      dev.Enabled,
 				Port:         dev.Port,
 				BaudRate:     dev.BaudRate,
+				DataBits:     dev.DataBits,
+				StopBits:     dev.StopBits,
+				Parity:       dev.Parity,
 				SlaveID:      dev.SlaveID,
 				PollInterval: dev.PollInterval,
 				Timeout:      dev.Timeout,
@@ -316,9 +382,19 @@ func (h *DeviceHandler) Delete(c *gin.Context) {
 func (h *DeviceHandler) GetStatus(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: 查询实际设备连接状态
-	_ = id
+	// 从采集器获取实时状态
+	if h.collector != nil {
+		status := h.collector.GetDeviceStatus(id)
+		if status != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"code": 0,
+				"data": status,
+			})
+			return
+		}
+	}
 
+	// 设备未被采集器管理，返回默认状态
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{
@@ -326,7 +402,7 @@ func (h *DeviceHandler) GetStatus(c *gin.Context) {
 			"online":       false,
 			"last_poll":    nil,
 			"error_count":  0,
-			"last_error":   "",
+			"last_error":   "设备未纳入采集",
 		},
 	})
 }

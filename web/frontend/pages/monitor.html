@@ -71,23 +71,41 @@
 <script>
 async function initMonitorPage() {
     await loadDeviceStatus();
-    // 每5秒刷新一次
-    setInterval(loadDeviceStatus, 5000);
+    // 每5秒刷新一次，记录到全局定时器列表
+    var intervalId = setInterval(loadDeviceStatus, 5000);
+    if (typeof pageIntervals !== 'undefined') {
+        pageIntervals.push(intervalId);
+    }
 }
 
 async function loadDeviceStatus() {
     try {
-        const result = await api('GET', '/monitor/devices');
+        var result = await api('GET', '/monitor/devices');
         if (result && result.code === 0) {
-            const data = result.data;
-            document.getElementById('totalDevices').textContent = data.total || 0;
-            document.getElementById('onlineDevices').textContent = data.online || 0;
-            document.getElementById('offlineDevices').textContent = data.offline || 0;
-            document.getElementById('onlineCount').textContent = `在线: ${data.online || 0}`;
-            document.getElementById('offlineCount').textContent = `离线: ${data.offline || 0}`;
+            var data = result.data;
+            var el;
+            el = document.getElementById('totalDevices');
+            if (el) el.textContent = data.total || 0;
+            el = document.getElementById('onlineDevices');
+            if (el) el.textContent = data.online || 0;
+            el = document.getElementById('offlineDevices');
+            if (el) el.textContent = data.offline || 0;
+            el = document.getElementById('onlineCount');
+            if (el) el.textContent = '在线: ' + (data.online || 0);
+            el = document.getElementById('offlineCount');
+            if (el) el.textContent = '离线: ' + (data.offline || 0);
         }
 
-        const deviceResult = await api('GET', '/devices');
+        // 获取未确认报警数量
+        try {
+            var alarmResult = await api('GET', '/alarm/stats');
+            if (alarmResult && alarmResult.code === 0) {
+                var alarmEl = document.getElementById('alarmCount');
+                if (alarmEl) alarmEl.textContent = alarmResult.data.unacked || 0;
+            }
+        } catch (e) {}
+
+        var deviceResult = await api('GET', '/devices');
         if (deviceResult && deviceResult.code === 0) {
             renderMonitorTable(deviceResult.data || []);
         }
@@ -119,7 +137,78 @@ function renderMonitorTable(devices) {
     `).join('');
 }
 
-function viewDeviceData(id) {
-    showToast('设备数据详情功能开发中', 'warning');
+async function viewDeviceData(id) {
+    try {
+        const result = await api('GET', `/monitor/devices/${id}`);
+        if (result && result.code === 0) {
+            const data = result.data;
+            showDeviceDataModal(id, data);
+        } else {
+            showToast('获取设备数据失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+function showDeviceDataModal(deviceId, data) {
+    // 移除已存在的模态框
+    const existingModal = document.getElementById('deviceDataModal');
+    if (existingModal) existingModal.remove();
+
+    const status = data.status || {};
+    const points = data.points || {};
+
+    let pointsHtml = '';
+    if (Object.keys(points).length > 0) {
+        pointsHtml = '<table class="table table-sm"><thead><tr><th>数据点</th><th>值</th><th>质量</th><th>时间</th></tr></thead><tbody>';
+        for (const [name, point] of Object.entries(points)) {
+            // quality: 0=good, 1=bad, 2=uncertain, 3=timeout, 4=disconnected
+            const isGood = point.quality === 0 || point.quality === 'good';
+            const qualityLabel = isGood ? '好' : '坏';
+            const qualityClass = isGood ? 'bg-success' : 'bg-danger';
+            pointsHtml += `<tr>
+                <td>${name}</td>
+                <td>${point.value !== undefined ? point.value : '-'}</td>
+                <td><span class="badge ${qualityClass}">${qualityLabel}</span></td>
+                <td>${formatTime(point.timestamp)}</td>
+            </tr>`;
+        }
+        pointsHtml += '</tbody></table>';
+    } else {
+        pointsHtml = '<p class="text-muted text-center py-3">暂无实时数据</p>';
+    }
+
+    const modalHtml = `
+    <div class="modal fade" id="deviceDataModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">设备详情: ${deviceId}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <p><strong>状态:</strong> ${formatStatus(status.online)}</p>
+                            <p><strong>最后轮询:</strong> ${formatTime(status.last_poll)}</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>错误次数:</strong> ${status.error_count || 0}</p>
+                            <p><strong>最后错误:</strong> ${status.last_error || '-'}</p>
+                        </div>
+                    </div>
+                    <h6>实时数据</h6>
+                    ${pointsHtml}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('deviceDataModal')).show();
 }
 </script>

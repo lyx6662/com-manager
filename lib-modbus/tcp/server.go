@@ -3,13 +3,13 @@ package tcp
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/lyx6662/com-manager/internal/protocol/modbus"
+	"github.com/lyx6662/com-manager/lib-modbus"
 	"github.com/lyx6662/com-manager/pkg/logger"
-	"github.com/lyx6662/com-manager/pkg/model"
 )
 
 // ServerConfig TCP服务器配置
@@ -28,7 +28,7 @@ type Server struct {
 	mu          sync.RWMutex
 	listener    net.Listener
 	connections map[net.Conn]bool
-	registers   map[uint16]uint16 // 寄存器存储
+	store       *modbus.RegisterStore
 	running     bool
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -45,7 +45,7 @@ func NewServer(cfg ServerConfig, log *logger.Logger) *Server {
 		cfg:         cfg,
 		log:         log,
 		connections: make(map[net.Conn]bool),
-		registers:   make(map[uint16]uint16),
+		store:       modbus.NewRegisterStore(),
 	}
 }
 
@@ -144,25 +144,12 @@ func (s *Server) OnMasterDisconnected(callback func()) {
 
 // UpdateRegisters 更新寄存器值
 func (s *Server) UpdateRegisters(startAddr uint16, values []uint16) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i, val := range values {
-		s.registers[startAddr+uint16(i)] = val
-	}
+	s.store.UpdateRegisters(startAddr, values)
 }
 
-// WriteDataPoints 写入数据点
-func (s *Server) WriteDataPoints(points []model.DataPoint) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for _, point := range points {
-		// TODO: 根据映射表转换为寄存器值
-		_ = point
-	}
-
-	return nil
+// UpdateCoils 更新线圈值
+func (s *Server) UpdateCoils(startAddr uint16, values []bool) {
+	s.store.UpdateCoils(startAddr, values)
 }
 
 // acceptConnections 接受连接
@@ -251,9 +238,9 @@ func (s *Server) handleConnection(conn net.Conn) {
 		// 设置读超时
 		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
-		// 读取MBAP头 (7字节)
-		header := make([]byte, 7)
-		_, err := conn.Read(header)
+		// 读取MBAP头 (6字节: TransactionID + ProtocolID + Length)
+		header := make([]byte, 6)
+		_, err := io.ReadFull(conn, header)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				continue
@@ -261,22 +248,27 @@ func (s *Server) handleConnection(conn net.Conn) {
 			return
 		}
 
-		// 解析帧长度
+		// 解析帧长度 (包含 UnitID + PDU)
 		frameLength := int(header[4])<<8 | int(header[5])
 		if frameLength < 2 || frameLength > 256 {
 			s.log.Warn("无效的帧长度", "length", frameLength)
 			continue
 		}
 
-		// 读取剩余数据
+		// 读取剩余数据 (UnitID + PDU)
 		body := make([]byte, frameLength)
-		_, err = conn.Read(body)
+		_, err = io.ReadFull(conn, body)
 		if err != nil {
 			return
 		}
 
 		// 组合完整帧
 		fullFrame := append(header, body...)
+		s.log.Debug("收到原始数据",
+			"header", fmt.Sprintf("%X", header),
+			"body", fmt.Sprintf("%X", body),
+			"full", fmt.Sprintf("%X", fullFrame),
+		)
 		tcpFrame, err := modbus.ParseTCPFrame(fullFrame)
 		if err != nil {
 			s.log.Warn("解析TCP帧失败", "error", err)
@@ -284,22 +276,37 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		// 处理请求
+		s.log.Debug("收到Modbus请求",
+			"transaction_id", tcpFrame.TransactionID,
+			"function_code", tcpFrame.FunctionCode,
+			"unit_id", tcpFrame.UnitID,
+			"data_len", len(tcpFrame.Data),
+		)
 		response := s.handleRequest(tcpFrame)
 		if response != nil {
+			encoded := response.Encode()
+			s.log.Debug("编码响应",
+				"len", len(encoded),
+				"data", fmt.Sprintf("%X", encoded),
+			)
 			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			_, err = conn.Write(response.Encode())
+			n, err := conn.Write(encoded)
 			if err != nil {
+				s.log.Error("发送响应失败", "error", err, "bytes_written", n)
 				return
 			}
+			s.log.Debug("发送Modbus响应",
+				"transaction_id", response.TransactionID,
+				"function_code", response.FunctionCode,
+				"data_len", len(response.Data),
+				"bytes_written", n,
+			)
 		}
 	}
 }
 
 // handleRequest 处理Modbus请求
 func (s *Server) handleRequest(request *modbus.TCPFrame) *modbus.TCPFrame {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	response := &modbus.TCPFrame{
 		TransactionID: request.TransactionID,
 		ProtocolID:    0x0000,
@@ -309,25 +316,30 @@ func (s *Server) handleRequest(request *modbus.TCPFrame) *modbus.TCPFrame {
 
 	switch request.FunctionCode {
 	case modbus.FuncReadHoldingRegs:
-		return s.handleReadHoldingRegs(request, response)
+		return s.handleReadRegs(request, response)
 	case modbus.FuncReadInputRegs:
-		return s.handleReadInputRegs(request, response)
+		return s.handleReadRegs(request, response)
 	case modbus.FuncReadCoils:
 		return s.handleReadCoils(request, response)
+	case modbus.FuncReadDiscreteInputs:
+		return s.handleReadDiscreteInputs(request, response)
 	case modbus.FuncWriteSingleReg:
 		return s.handleWriteSingleReg(request, response)
 	case modbus.FuncWriteMultiRegs:
 		return s.handleWriteMultiRegs(request, response)
+	case modbus.FuncWriteSingleCoil:
+		return s.handleWriteSingleCoil(request, response)
+	case modbus.FuncWriteMultiCoils:
+		return s.handleWriteMultiCoils(request, response)
 	default:
-		// 不支持的功能码
 		response.FunctionCode = request.FunctionCode | 0x80
 		response.Data = []byte{byte(modbus.ExceptionIllegalFunction)}
 		return response
 	}
 }
 
-// handleReadHoldingRegs 处理读保持寄存器
-func (s *Server) handleReadHoldingRegs(request, response *modbus.TCPFrame) *modbus.TCPFrame {
+// handleReadRegs 处理读保持/输入寄存器
+func (s *Server) handleReadRegs(request, response *modbus.TCPFrame) *modbus.TCPFrame {
 	if len(request.Data) < 4 {
 		return s.makeExceptionResponse(request, modbus.ExceptionIllegalDataValue)
 	}
@@ -335,33 +347,20 @@ func (s *Server) handleReadHoldingRegs(request, response *modbus.TCPFrame) *modb
 	startAddr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
 	quantity := uint16(request.Data[2])<<8 | uint16(request.Data[3])
 
-	if quantity == 0 || quantity > 125 {
-		return s.makeExceptionResponse(request, modbus.ExceptionIllegalDataValue)
-	}
+	s.log.Debug("读取寄存器",
+		"start_addr", startAddr,
+		"quantity", quantity,
+		"data_len", len(request.Data),
+		"data", fmt.Sprintf("%X", request.Data),
+	)
 
-	// 读取寄存器
-	byteCount := quantity * 2
-	data := make([]byte, 1+byteCount)
-	data[0] = byte(byteCount)
-
-	for i := uint16(0); i < quantity; i++ {
-		addr := startAddr + i
-		val, exists := s.registers[addr]
-		if !exists {
-			val = 0
-		}
-		data[1+i*2] = byte(val >> 8)
-		data[1+i*2+1] = byte(val & 0xFF)
+	data, exCode := s.store.ReadRegisters(startAddr, quantity)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
 	}
 
 	response.Data = data
 	return response
-}
-
-// handleReadInputRegs 处理读输入寄存器
-func (s *Server) handleReadInputRegs(request, response *modbus.TCPFrame) *modbus.TCPFrame {
-	// 逻辑同读保持寄存器
-	return s.handleReadHoldingRegs(request, response)
 }
 
 // handleReadCoils 处理读线圈
@@ -373,12 +372,28 @@ func (s *Server) handleReadCoils(request, response *modbus.TCPFrame) *modbus.TCP
 	startAddr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
 	quantity := uint16(request.Data[2])<<8 | uint16(request.Data[3])
 
-	byteCount := (quantity + 7) / 8
-	data := make([]byte, 1+byteCount)
-	data[0] = byte(byteCount)
+	data, exCode := s.store.ReadCoils(startAddr, quantity)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
+	}
 
-	// TODO: 读取线圈状态
-	_ = startAddr
+	response.Data = data
+	return response
+}
+
+// handleReadDiscreteInputs 处理读离散输入
+func (s *Server) handleReadDiscreteInputs(request, response *modbus.TCPFrame) *modbus.TCPFrame {
+	if len(request.Data) < 4 {
+		return s.makeExceptionResponse(request, modbus.ExceptionIllegalDataValue)
+	}
+
+	startAddr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
+	quantity := uint16(request.Data[2])<<8 | uint16(request.Data[3])
+
+	data, exCode := s.store.ReadDiscreteInputs(startAddr, quantity)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
+	}
 
 	response.Data = data
 	return response
@@ -393,43 +408,52 @@ func (s *Server) handleWriteSingleReg(request, response *modbus.TCPFrame) *modbu
 	addr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
 	value := uint16(request.Data[2])<<8 | uint16(request.Data[3])
 
-	s.registers[addr] = value
+	data, exCode := s.store.WriteSingleReg(addr, value)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
+	}
 
-	// 回显请求数据
-	response.Data = request.Data
+	response.Data = data
 	return response
 }
 
 // handleWriteMultiRegs 处理写多个寄存器
 func (s *Server) handleWriteMultiRegs(request, response *modbus.TCPFrame) *modbus.TCPFrame {
-	if len(request.Data) < 5 {
+	data, exCode := s.store.WriteMultiRegs(request.Data)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
+	}
+
+	response.Data = data
+	return response
+}
+
+// handleWriteSingleCoil 处理写单个线圈
+func (s *Server) handleWriteSingleCoil(request, response *modbus.TCPFrame) *modbus.TCPFrame {
+	if len(request.Data) < 4 {
 		return s.makeExceptionResponse(request, modbus.ExceptionIllegalDataValue)
 	}
 
-	startAddr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
-	quantity := uint16(request.Data[2])<<8 | uint16(request.Data[3])
-	byteCount := int(request.Data[4])
+	addr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
+	value := uint16(request.Data[2])<<8 | uint16(request.Data[3])
 
-	if len(request.Data) < 5+byteCount {
-		return s.makeExceptionResponse(request, modbus.ExceptionIllegalDataValue)
+	data, exCode := s.store.WriteSingleCoil(addr, value)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
 	}
 
-	// 写入寄存器
-	for i := uint16(0); i < quantity; i++ {
-		offset := 5 + i*2
-		if offset+1 < uint16(len(request.Data)) {
-			value := uint16(request.Data[offset])<<8 | uint16(request.Data[offset+1])
-			s.registers[startAddr+i] = value
-		}
+	response.Data = data
+	return response
+}
+
+// handleWriteMultiCoils 处理写多个线圈
+func (s *Server) handleWriteMultiCoils(request, response *modbus.TCPFrame) *modbus.TCPFrame {
+	data, exCode := s.store.WriteMultiCoils(request.Data)
+	if exCode != 0 {
+		return s.makeExceptionResponse(request, exCode)
 	}
 
-	// 返回确认
-	response.Data = make([]byte, 4)
-	response.Data[0] = byte(startAddr >> 8)
-	response.Data[1] = byte(startAddr & 0xFF)
-	response.Data[2] = byte(quantity >> 8)
-	response.Data[3] = byte(quantity & 0xFF)
-
+	response.Data = data
 	return response
 }
 
