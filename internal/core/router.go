@@ -158,6 +158,19 @@ func (r *Router) UpdateData(deviceID string, points []model.DataPoint) {
 	r.refreshOutputs(deviceID)
 }
 
+// UpdateDataCache 仅更新数据缓存，不触发输出（用于新架构，输出由适配器处理）
+func (r *Router) UpdateDataCache(deviceID string, points []model.DataPoint) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.dataCache[deviceID] == nil {
+		r.dataCache[deviceID] = make(map[string]model.DataPoint)
+	}
+	for _, pt := range points {
+		r.dataCache[deviceID][pt.Name] = pt
+	}
+}
+
 // handleBatchPoints 处理批量数据点 (用于int32_dcba_batch和raw_batch类型)
 func (r *Router) handleBatchPoints(deviceID string, points []model.DataPoint) {
 	r.mu.RLock()

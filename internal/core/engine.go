@@ -309,6 +309,9 @@ func (e *Engine) Reload() error {
 	// 更新路由器中的服务器注册
 	e.initRouter()
 
+	// 更新输出适配器配置
+	e.reloadOutputAdapters()
+
 	// 重新加载报警规则
 	if e.alarmDetector != nil {
 		e.alarmDetector.LoadRulesFromConfig(newCfg)
@@ -672,6 +675,51 @@ func (e *Engine) initCommandBus() {
 	}
 }
 
+// reloadOutputAdapters 热重载输出适配器配置
+func (e *Engine) reloadOutputAdapters() {
+	// 更新 Modbus 输出适配器的服务器绑定
+	if e.modbusAdapter != nil {
+		// 重新绑定服务器
+		for groupID, srv := range e.tcpServers {
+			e.modbusAdapter.SetTCPServer(srv)
+			e.log.Debug("Modbus 适配器重新绑定 TCP 服务器", "group", groupID)
+		}
+		for groupID, srv := range e.rtuServers {
+			e.modbusAdapter.SetRTUServer(srv)
+			e.log.Debug("Modbus 适配器重新绑定 RTU 服务器", "group", groupID)
+		}
+
+		// 更新映射规则
+		allMappings := make([]ModbusOutputMapping, 0)
+		for _, rules := range e.cfg.Mappings {
+			for _, rule := range rules {
+				allMappings = append(allMappings, ModbusOutputMapping{
+					SourceDevice:   rule.SourceDevice,
+					SourceName:     rule.Name,
+					SourceType:     rule.SourceType,
+					DataType:       rule.DataType,
+					TargetRegister: rule.TargetRegister,
+					Scale:          rule.Scale,
+					Offset:         rule.Offset,
+					ByteOrder:      rule.ByteOrder,
+					MaxPoints:      rule.MaxPoints,
+				})
+			}
+		}
+		e.modbusAdapter.SetMappings(allMappings)
+		e.log.Info("Modbus 输出适配器映射已更新", "mappings", len(allMappings))
+	}
+
+	// 更新 IEC 61850 输出适配器的映射规则
+	if e.iecAdapter != nil && e.iec61850Mgr != nil {
+		e.iecAdapter.SetIEC61850Manager(e.iec61850Mgr)
+		e.iecAdapter.SetMappings(e.cfgMgr.GetIEC61850Mappings())
+		e.log.Info("IEC 61850 输出适配器映射已更新")
+	}
+
+	e.log.Info("输出适配器配置重载完成")
+}
+
 // GetCommandBus 获取命令总线
 func (e *Engine) GetCommandBus() *CommandBus {
 	return e.commandBus
@@ -689,17 +737,17 @@ func (e *Engine) GetDataPool() *DataPool {
 
 // onDeviceData 设备数据回调 — 将数据写入共享池并处理后续逻辑
 func (e *Engine) onDeviceData(deviceID string, points []model.DataPoint) {
-	// 写入统一数据共享池（会自动通知订阅的输出适配器）
+	// 写入统一数据共享池（会自动通知订阅的输出适配器，处理普通数据点）
 	e.dataPool.BatchUpdateData(deviceID, points)
 
-	// 交给路由器刷新输出寄存器 (保留用于向后兼容和批量数据点处理)
-	if e.router != nil {
-		e.router.UpdateData(deviceID, points)
-	}
-
-	// 处理批量数据点到 Modbus 适配器
+	// 处理批量数据点（带 Extra 字段的特殊数据点，如 batch 类型）
 	if e.modbusAdapter != nil {
 		e.modbusAdapter.BatchUpdatePoints(points)
+	}
+
+	// 更新路由器数据缓存（仅用于查询，不触发输出）
+	if e.router != nil {
+		e.router.UpdateDataCache(deviceID, points)
 	}
 
 	// 报警检测
