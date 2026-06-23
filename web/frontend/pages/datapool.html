@@ -3,8 +3,9 @@
         <i class="bi bi-database me-2"></i>数据池
     </h4>
     <div class="d-flex align-items-center">
+        <span class="badge bg-success me-2" id="dpOnlineCount">在线: 0</span>
+        <span class="badge bg-danger me-2" id="dpOfflineCount">离线: 0</span>
         <span class="badge bg-info me-2" id="dpPointCount">数据点: 0</span>
-        <span class="badge bg-secondary me-2" id="dpSubscriberCount">订阅者: 0</span>
         <div class="form-check form-check-inline me-2 mb-0">
             <input class="form-check-input" type="checkbox" id="dpAutoRefresh" checked>
             <label class="form-check-label small">自动刷新</label>
@@ -14,9 +15,6 @@
             <option value="5000" selected>5秒</option>
             <option value="10000">10秒</option>
         </select>
-        <select class="form-select form-select-sm d-inline-block w-auto me-2" id="dpDeviceFilter">
-            <option value="">全部设备</option>
-        </select>
         <button class="btn btn-outline-primary btn-sm" onclick="refreshDataPool()">
             <i class="bi bi-arrow-clockwise"></i> 刷新
         </button>
@@ -25,19 +23,35 @@
 
 <!-- 汇总统计卡片 -->
 <div class="row mb-4">
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="card text-center">
             <div class="card-body py-3">
-                <div class="text-muted small">总数据点</div>
-                <div class="fs-4 fw-bold text-primary" id="dpStatTotal">0</div>
+                <div class="text-muted small">设备总数</div>
+                <div class="fs-4 fw-bold text-primary" id="dpStatDevices">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small">在线设备</div>
+                <div class="fs-4 fw-bold text-success" id="dpStatOnline">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small">离线设备</div>
+                <div class="fs-4 fw-bold text-danger" id="dpStatOffline">0</div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card text-center">
             <div class="card-body py-3">
-                <div class="text-muted small">良好数据</div>
-                <div class="fs-4 fw-bold text-success" id="dpStatGood">0</div>
+                <div class="text-muted small">数据点总数</div>
+                <div class="fs-4 fw-bold text-info" id="dpStatTotal">0</div>
             </div>
         </div>
     </div>
@@ -45,68 +59,128 @@
         <div class="card text-center">
             <div class="card-body py-3">
                 <div class="text-muted small">异常数据</div>
-                <div class="fs-4 fw-bold text-danger" id="dpStatBad">0</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body py-3">
-                <div class="text-muted small">订阅者</div>
-                <div class="fs-4 fw-bold text-info" id="dpStatSubscribers">0</div>
+                <div class="fs-4 fw-bold text-warning" id="dpStatBad">0</div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 搜索/过滤 -->
-<div class="card mb-3">
-    <div class="card-body py-2">
-        <div class="row align-items-center">
-            <div class="col-md-4">
-                <input type="text" class="form-control form-control-sm" id="dpSearch" placeholder="搜索数据点名称或设备ID...">
+<!-- Tab 切换 -->
+<ul class="nav nav-tabs mb-3" id="dpTabs">
+    <li class="nav-item">
+        <a class="nav-link active" href="#" onclick="switchDpTab('data')">
+            <i class="bi bi-table me-1"></i>数据点
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="switchDpTab('devices')">
+            <i class="bi bi-hdd-rack me-1"></i>设备状态
+        </a>
+    </li>
+</ul>
+
+<!-- 数据点 Tab -->
+<div id="dpTabData">
+    <!-- 搜索/过滤 -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" id="dpDeviceFilter">
+                        <option value="">全部设备</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" id="dpSearch" placeholder="搜索数据点...">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" id="dpQualityFilter">
+                        <option value="">全部质量</option>
+                        <option value="0">良好</option>
+                        <option value="1">坏</option>
+                        <option value="2">不确定</option>
+                        <option value="3">超时</option>
+                        <option value="4">断开</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <small class="text-muted" id="dpLastRefresh">最后刷新: -</small>
+                </div>
             </div>
-            <div class="col-md-3">
-                <select class="form-select form-select-sm" id="dpQualityFilter">
-                    <option value="">全部质量</option>
-                    <option value="0">良好</option>
-                    <option value="1">坏</option>
-                    <option value="2">不确定</option>
-                    <option value="3">超时</option>
-                    <option value="4">断开</option>
-                </select>
-            </div>
-            <div class="col-md-5 text-end">
-                <small class="text-muted" id="dpLastRefresh">最后刷新: -</small>
+        </div>
+    </div>
+
+    <!-- 数据点表格 -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>设备ID</th>
+                            <th>数据点</th>
+                            <th>值</th>
+                            <th>数据类型</th>
+                            <th>质量</th>
+                            <th>更新次数</th>
+                            <th>最后更新</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dpTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <div class="spinner-border spinner-border-sm me-2"></div>加载中...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 数据点表格 -->
-<div class="card">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>设备ID</th>
-                        <th>数据点</th>
-                        <th>值</th>
-                        <th>数据类型</th>
-                        <th>质量</th>
-                        <th>更新次数</th>
-                        <th>最后更新</th>
-                    </tr>
-                </thead>
-                <tbody id="dpTableBody">
-                    <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
-                            <div class="spinner-border spinner-border-sm me-2"></div>加载中...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+<!-- 设备状态 Tab -->
+<div id="dpTabDevices" style="display:none;">
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>设备ID</th>
+                            <th>设备名称</th>
+                            <th>状态</th>
+                            <th>最后轮询</th>
+                            <th>错误次数</th>
+                            <th>最后错误</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dpDeviceTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 设备详情弹窗 -->
+<div class="modal fade" id="deviceDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deviceDetailTitle">设备详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="deviceDetailBody">
+                加载中...
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
         </div>
     </div>
 </div>
@@ -114,21 +188,32 @@
 <script>
 var dpAllPoints = [];
 var dpRefreshTimer = null;
+var dpAllDevices = [];
+
+// Tab 切换
+function switchDpTab(tab) {
+    document.getElementById('dpTabData').style.display = tab === 'data' ? 'block' : 'none';
+    document.getElementById('dpTabDevices').style.display = tab === 'devices' ? 'block' : 'none';
+    document.querySelectorAll('#dpTabs .nav-link').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('#dpTabs .nav-link')[tab === 'data' ? 0 : 1].classList.add('active');
+}
 
 async function initDatapoolPage() {
-    await loadDatapoolDevices();
-    await loadDataPoolData();
+    await loadDpDevices();
+    await loadDpData();
+    await loadDpDeviceStatus();
     setupDpAutoRefresh();
 }
 
-// 加载设备列表用于过滤下拉框
-async function loadDatapoolDevices() {
+// 加载设备列表
+async function loadDpDevices() {
     try {
-        const result = await api('GET', '/devices');
+        var result = await api('GET', '/devices');
         if (result && result.code === 0) {
-            const select = document.getElementById('dpDeviceFilter');
+            dpAllDevices = result.data || [];
+            var select = document.getElementById('dpDeviceFilter');
             select.innerHTML = '<option value="">全部设备</option>';
-            (result.data || []).forEach(function(device) {
+            dpAllDevices.forEach(function(device) {
                 var option = document.createElement('option');
                 option.value = device.id;
                 option.textContent = device.name + ' (' + device.id + ')';
@@ -141,7 +226,7 @@ async function loadDatapoolDevices() {
 }
 
 // 加载数据池数据
-async function loadDataPoolData() {
+async function loadDpData() {
     try {
         var deviceFilter = document.getElementById('dpDeviceFilter').value;
         var result;
@@ -154,38 +239,52 @@ async function loadDataPoolData() {
 
         if (result && result.code === 0) {
             dpAllPoints = result.data.points || [];
-            renderDataPoolTable();
+            renderDpTable();
         }
 
-        // 加载统计信息
+        // 加载统计
         var statsResult = await api('GET', '/datapool/stats');
         if (statsResult && statsResult.code === 0) {
-            var stats = statsResult.data;
-            document.getElementById('dpPointCount').textContent = '数据点: ' + (stats.total_points || 0);
-            document.getElementById('dpSubscriberCount').textContent = '订阅者: ' + (stats.subscriber_count || 0);
-            document.getElementById('dpStatTotal').textContent = stats.total_points || 0;
-            document.getElementById('dpStatSubscribers').textContent = stats.subscriber_count || 0;
+            document.getElementById('dpPointCount').textContent = '数据点: ' + (statsResult.data.total_points || 0);
+            document.getElementById('dpStatTotal').textContent = statsResult.data.total_points || 0;
         }
 
-        // 计算良好/异常数据数
-        var goodCount = 0;
+        // 计算异常数据
         var badCount = 0;
-        dpAllPoints.forEach(function(p) {
-            if (p.quality === 0) goodCount++;
-            else badCount++;
-        });
-        document.getElementById('dpStatGood').textContent = goodCount;
+        dpAllPoints.forEach(function(p) { if (p.quality !== 0) badCount++; });
         document.getElementById('dpStatBad').textContent = badCount;
 
-        // 更新最后刷新时间
         document.getElementById('dpLastRefresh').textContent = '最后刷新: ' + new Date().toLocaleTimeString('zh-CN');
     } catch (error) {
         console.error('加载数据池数据失败:', error);
     }
 }
 
-// 渲染数据表格
-function renderDataPoolTable() {
+// 加载设备状态
+async function loadDpDeviceStatus() {
+    try {
+        var result = await api('GET', '/monitor/devices');
+        if (result && result.code === 0) {
+            var data = result.data;
+            document.getElementById('dpStatDevices').textContent = data.total || 0;
+            document.getElementById('dpStatOnline').textContent = data.online || 0;
+            document.getElementById('dpStatOffline').textContent = data.offline || 0;
+            document.getElementById('dpOnlineCount').textContent = '在线: ' + (data.online || 0);
+            document.getElementById('dpOfflineCount').textContent = '离线: ' + (data.offline || 0);
+        }
+
+        // 渲染设备表格
+        var deviceResult = await api('GET', '/devices');
+        if (deviceResult && deviceResult.code === 0) {
+            renderDpDeviceTable(deviceResult.data || []);
+        }
+    } catch (error) {
+        console.error('加载设备状态失败:', error);
+    }
+}
+
+// 渲染数据点表格
+function renderDpTable() {
     var search = document.getElementById('dpSearch').value.toLowerCase();
     var qualityFilter = document.getElementById('dpQualityFilter').value;
 
@@ -201,7 +300,6 @@ function renderDataPoolTable() {
         filtered = filtered.filter(function(p) { return p.quality === q; });
     }
 
-    // 按设备ID和数据点名排序
     filtered.sort(function(a, b) {
         if (a.device_id !== b.device_id) return a.device_id.localeCompare(b.device_id);
         return a.point_name.localeCompare(b.point_name);
@@ -213,40 +311,96 @@ function renderDataPoolTable() {
         return;
     }
 
-    tbody.innerHTML = filtered.map(function(point) {
+    tbody.innerHTML = filtered.map(function(p) {
+        var qualityMap = {
+            0: { text: '良好', cls: 'bg-success', icon: 'check-circle' },
+            1: { text: '坏', cls: 'bg-danger', icon: 'x-circle' },
+            2: { text: '不确定', cls: 'bg-warning', icon: 'question-circle' },
+            3: { text: '超时', cls: 'bg-warning', icon: 'clock' },
+            4: { text: '断开', cls: 'bg-secondary', icon: 'wifi-off' }
+        };
+        var q = qualityMap[p.quality] || { text: '未知', cls: 'bg-secondary', icon: 'question' };
+        var val = p.value;
+        if (val === null || val === undefined) val = '-';
+        else if (p.data_type === 'float32' || p.data_type === 'float64') val = typeof val === 'number' ? val.toFixed(4) : val;
+
         return '<tr>' +
-            '<td><code>' + point.device_id + '</code></td>' +
-            '<td>' + point.point_name + '</td>' +
-            '<td><strong>' + formatDpValue(point.value, point.data_type) + '</strong></td>' +
-            '<td><span class="badge bg-secondary">' + point.data_type + '</span></td>' +
-            '<td>' + formatDpQuality(point.quality) + '</td>' +
-            '<td>' + (point.update_count || 0) + '</td>' +
-            '<td>' + formatDpTime(point.timestamp) + '</td>' +
+            '<td><code>' + p.device_id + '</code></td>' +
+            '<td>' + p.point_name + '</td>' +
+            '<td><strong>' + val + '</strong></td>' +
+            '<td><span class="badge bg-secondary">' + p.data_type + '</span></td>' +
+            '<td><span class="badge ' + q.cls + '"><i class="bi bi-' + q.icon + ' me-1"></i>' + q.text + '</span></td>' +
+            '<td>' + (p.update_count || 0) + '</td>' +
+            '<td>' + formatDpTime(p.timestamp) + '</td>' +
             '</tr>';
     }).join('');
 }
 
-// 格式化数据值
-function formatDpValue(value, dataType) {
-    if (value === null || value === undefined) return '-';
-    if (dataType === 'float32' || dataType === 'float64') {
-        return typeof value === 'number' ? value.toFixed(4) : value;
+// 渲染设备状态表格
+function renderDpDeviceTable(devices) {
+    var tbody = document.getElementById('dpDeviceTableBody');
+    if (devices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无设备</td></tr>';
+        return;
     }
-    if (dataType === 'bool') return value ? 'TRUE' : 'FALSE';
-    return String(value);
+
+    tbody.innerHTML = devices.map(function(d) {
+        var statusBadge = d.online ? '<span class="badge bg-success">在线</span>' : '<span class="badge bg-danger">离线</span>';
+        var lastPoll = d.last_poll ? new Date(d.last_poll).toLocaleTimeString('zh-CN') : '-';
+        var lastError = d.last_error || '-';
+        if (lastError.length > 30) lastError = lastError.substring(0, 30) + '...';
+
+        return '<tr>' +
+            '<td><code>' + d.id + '</code></td>' +
+            '<td>' + d.name + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' + lastPoll + '</td>' +
+            '<td>' + (d.error_count || 0) + '</td>' +
+            '<td><small class="text-muted">' + lastError + '</small></td>' +
+            '<td><button class="btn btn-sm btn-outline-primary" onclick="viewDevicePoints(\'' + d.id + '\')"><i class="bi bi-eye"></i> 数据</button></td>' +
+            '</tr>';
+    }).join('');
 }
 
-// 格式化质量标签
-function formatDpQuality(quality) {
-    var map = {
-        0: { text: '良好', cls: 'bg-success', icon: 'check-circle' },
-        1: { text: '坏', cls: 'bg-danger', icon: 'x-circle' },
-        2: { text: '不确定', cls: 'bg-warning', icon: 'question-circle' },
-        3: { text: '超时', cls: 'bg-warning', icon: 'clock' },
-        4: { text: '断开', cls: 'bg-secondary', icon: 'wifi-off' }
-    };
-    var info = map[quality] || { text: '未知', cls: 'bg-secondary', icon: 'question' };
-    return '<span class="badge ' + info.cls + '"><i class="bi bi-' + info.icon + ' me-1"></i>' + info.text + '</span>';
+// 查看设备数据点
+async function viewDevicePoints(deviceId) {
+    try {
+        var result = await api('GET', '/datapool/device/' + deviceId);
+        if (result && result.code === 0) {
+            showDevicePointsModal(deviceId, result.data);
+        }
+    } catch (error) {
+        showToast('获取设备数据失败', 'danger');
+    }
+}
+
+function showDevicePointsModal(deviceId, data) {
+    var existing = document.getElementById('devicePointsModal');
+    if (existing) existing.remove();
+
+    var points = data.points || [];
+    var pointsHtml = '';
+    if (points.length > 0) {
+        pointsHtml = '<table class="table table-sm"><thead><tr><th>数据点</th><th>值</th><th>类型</th><th>质量</th><th>更新次数</th></tr></thead><tbody>';
+        points.forEach(function(p) {
+            var qMap = { 0: 'bg-success|良好', 1: 'bg-danger|坏', 2: 'bg-warning|不确定', 3: 'bg-warning|超时', 4: 'bg-secondary|断开' };
+            var q = qMap[p.quality] || 'bg-secondary|未知';
+            var qParts = q.split('|');
+            pointsHtml += '<tr><td>' + p.point_name + '</td><td><strong>' + (p.value !== null ? p.value : '-') + '</strong></td><td>' + p.data_type + '</td><td><span class="badge ' + qParts[0] + '">' + qParts[1] + '</span></td><td>' + (p.update_count || 0) + '</td></tr>';
+        });
+        pointsHtml += '</tbody></table>';
+    } else {
+        pointsHtml = '<p class="text-muted text-center py-3">暂无数据</p>';
+    }
+
+    var modalHtml = '<div class="modal fade" id="devicePointsModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">' +
+        '<div class="modal-header"><h5 class="modal-title">设备数据: ' + deviceId + ' (' + points.length + ' 个点)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+        '<div class="modal-body">' + pointsHtml + '</div>' +
+        '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button></div>' +
+        '</div></div></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('devicePointsModal')).show();
 }
 
 // 格式化时间
@@ -264,37 +418,35 @@ function setupDpAutoRefresh() {
     function startRefresh() {
         if (dpRefreshTimer) clearInterval(dpRefreshTimer);
         var interval = parseInt(intervalSelect.value);
-        dpRefreshTimer = setInterval(loadDataPoolData, interval);
+        dpRefreshTimer = setInterval(function() {
+            loadDpData();
+            loadDpDeviceStatus();
+        }, interval);
         if (typeof pageIntervals !== 'undefined') {
             pageIntervals.push(dpRefreshTimer);
         }
     }
 
     checkbox.addEventListener('change', function() {
-        if (checkbox.checked) {
-            startRefresh();
-        } else {
-            if (dpRefreshTimer) clearInterval(dpRefreshTimer);
-        }
+        if (checkbox.checked) startRefresh();
+        else if (dpRefreshTimer) clearInterval(dpRefreshTimer);
     });
 
     intervalSelect.addEventListener('change', function() {
         if (checkbox.checked) startRefresh();
     });
 
-    // 设备过滤变化时重新加载
-    document.getElementById('dpDeviceFilter').addEventListener('change', loadDataPoolData);
-
-    // 搜索和质量过滤变化时重新渲染（不重新请求）
-    document.getElementById('dpSearch').addEventListener('input', renderDataPoolTable);
-    document.getElementById('dpQualityFilter').addEventListener('change', renderDataPoolTable);
+    document.getElementById('dpDeviceFilter').addEventListener('change', loadDpData);
+    document.getElementById('dpSearch').addEventListener('input', renderDpTable);
+    document.getElementById('dpQualityFilter').addEventListener('change', renderDpTable);
 
     startRefresh();
 }
 
 // 手动刷新
 async function refreshDataPool() {
-    await loadDataPoolData();
+    await loadDpData();
+    await loadDpDeviceStatus();
     showToast('数据池已刷新');
 }
 </script>

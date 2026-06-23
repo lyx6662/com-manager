@@ -434,12 +434,15 @@ async function loadIEC61850Data() {
         var statusResult = await api('GET', '/iec61850/status');
         if (statusResult && statusResult.code === 0) {
             var status = statusResult.data;
+            var isRunning = status.enabled || status.running;
             document.getElementById('iec61850StatusPanel').innerHTML =
                 '<table class="table table-sm mb-0">' +
-                '<tr><td class="text-muted">状态</td><td>' + (status.running ? '<span class="badge bg-success">运行中</span>' : '<span class="badge bg-secondary">已停止</span>') + '</td></tr>' +
+                '<tr><td class="text-muted">状态</td><td>' + (isRunning ? '<span class="badge bg-success">运行中</span>' : '<span class="badge bg-secondary">已停止</span>') + '</td></tr>' +
                 '<tr><td class="text-muted">端口</td><td>' + (status.port || '-') + '</td></tr>' +
                 '<tr><td class="text-muted">IED 名称</td><td>' + (status.ied_name || '-') + '</td></tr>' +
                 '<tr><td class="text-muted">映射数</td><td>' + (status.mapping_count || 0) + '</td></tr>' +
+                '<tr><td class="text-muted">最大连接数</td><td>' + (status.max_connections || '-') + '</td></tr>' +
+                '<tr><td class="text-muted">当前连接</td><td>' + (status.active_connections || 0) + '</td></tr>' +
                 '</table>';
             document.getElementById('statusIECPort').textContent = status.port || '-';
         }
