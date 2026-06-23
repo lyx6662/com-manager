@@ -139,3 +139,38 @@ body {
     font-size: 0.85em;
     color: #d63384;
 }
+
+/* 质量指示器 */
+.quality-good { color: #198754; }
+.quality-bad { color: #dc3545; }
+.quality-uncertain { color: #ffc107; }
+.quality-timeout { color: #fd7e14; }
+.quality-disconnected { color: #6c757d; }
+
+/* 数据池统计卡片 */
+.card .fs-4 {
+    line-height: 1.2;
+}
+
+/* Tab 切换样式 */
+.nav-tabs .nav-link {
+    color: #495057;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.75rem 1rem;
+}
+
+.nav-tabs .nav-link:hover {
+    border-bottom-color: #dee2e6;
+}
+
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+    background: none;
+}
+
+/* 输出管理 Tab 内容 */
+.output-tab {
+    min-height: 400px;
+}

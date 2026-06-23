@@ -1,0 +1,300 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">
+        <i class="bi bi-database me-2"></i>数据池
+    </h4>
+    <div class="d-flex align-items-center">
+        <span class="badge bg-info me-2" id="dpPointCount">数据点: 0</span>
+        <span class="badge bg-secondary me-2" id="dpSubscriberCount">订阅者: 0</span>
+        <div class="form-check form-check-inline me-2 mb-0">
+            <input class="form-check-input" type="checkbox" id="dpAutoRefresh" checked>
+            <label class="form-check-label small">自动刷新</label>
+        </div>
+        <select class="form-select form-select-sm d-inline-block w-auto me-2" id="dpRefreshInterval">
+            <option value="2000">2秒</option>
+            <option value="5000" selected>5秒</option>
+            <option value="10000">10秒</option>
+        </select>
+        <select class="form-select form-select-sm d-inline-block w-auto me-2" id="dpDeviceFilter">
+            <option value="">全部设备</option>
+        </select>
+        <button class="btn btn-outline-primary btn-sm" onclick="refreshDataPool()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新
+        </button>
+    </div>
+</div>
+
+<!-- 汇总统计卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small">总数据点</div>
+                <div class="fs-4 fw-bold text-primary" id="dpStatTotal">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small">良好数据</div>
+                <div class="fs-4 fw-bold text-success" id="dpStatGood">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small">异常数据</div>
+                <div class="fs-4 fw-bold text-danger" id="dpStatBad">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small">订阅者</div>
+                <div class="fs-4 fw-bold text-info" id="dpStatSubscribers">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 搜索/过滤 -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <input type="text" class="form-control form-control-sm" id="dpSearch" placeholder="搜索数据点名称或设备ID...">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select form-select-sm" id="dpQualityFilter">
+                    <option value="">全部质量</option>
+                    <option value="0">良好</option>
+                    <option value="1">坏</option>
+                    <option value="2">不确定</option>
+                    <option value="3">超时</option>
+                    <option value="4">断开</option>
+                </select>
+            </div>
+            <div class="col-md-5 text-end">
+                <small class="text-muted" id="dpLastRefresh">最后刷新: -</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据点表格 -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>设备ID</th>
+                        <th>数据点</th>
+                        <th>值</th>
+                        <th>数据类型</th>
+                        <th>质量</th>
+                        <th>更新次数</th>
+                        <th>最后更新</th>
+                    </tr>
+                </thead>
+                <tbody id="dpTableBody">
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <div class="spinner-border spinner-border-sm me-2"></div>加载中...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+var dpAllPoints = [];
+var dpRefreshTimer = null;
+
+async function initDatapoolPage() {
+    await loadDatapoolDevices();
+    await loadDataPoolData();
+    setupDpAutoRefresh();
+}
+
+// 加载设备列表用于过滤下拉框
+async function loadDatapoolDevices() {
+    try {
+        const result = await api('GET', '/devices');
+        if (result && result.code === 0) {
+            const select = document.getElementById('dpDeviceFilter');
+            select.innerHTML = '<option value="">全部设备</option>';
+            (result.data || []).forEach(function(device) {
+                var option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = device.name + ' (' + device.id + ')';
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载设备列表失败:', error);
+    }
+}
+
+// 加载数据池数据
+async function loadDataPoolData() {
+    try {
+        var deviceFilter = document.getElementById('dpDeviceFilter').value;
+        var result;
+
+        if (deviceFilter) {
+            result = await api('GET', '/datapool/device/' + deviceFilter);
+        } else {
+            result = await api('GET', '/datapool');
+        }
+
+        if (result && result.code === 0) {
+            dpAllPoints = result.data.points || [];
+            renderDataPoolTable();
+        }
+
+        // 加载统计信息
+        var statsResult = await api('GET', '/datapool/stats');
+        if (statsResult && statsResult.code === 0) {
+            var stats = statsResult.data;
+            document.getElementById('dpPointCount').textContent = '数据点: ' + (stats.total_points || 0);
+            document.getElementById('dpSubscriberCount').textContent = '订阅者: ' + (stats.subscriber_count || 0);
+            document.getElementById('dpStatTotal').textContent = stats.total_points || 0;
+            document.getElementById('dpStatSubscribers').textContent = stats.subscriber_count || 0;
+        }
+
+        // 计算良好/异常数据数
+        var goodCount = 0;
+        var badCount = 0;
+        dpAllPoints.forEach(function(p) {
+            if (p.quality === 0) goodCount++;
+            else badCount++;
+        });
+        document.getElementById('dpStatGood').textContent = goodCount;
+        document.getElementById('dpStatBad').textContent = badCount;
+
+        // 更新最后刷新时间
+        document.getElementById('dpLastRefresh').textContent = '最后刷新: ' + new Date().toLocaleTimeString('zh-CN');
+    } catch (error) {
+        console.error('加载数据池数据失败:', error);
+    }
+}
+
+// 渲染数据表格
+function renderDataPoolTable() {
+    var search = document.getElementById('dpSearch').value.toLowerCase();
+    var qualityFilter = document.getElementById('dpQualityFilter').value;
+
+    var filtered = dpAllPoints;
+    if (search) {
+        filtered = filtered.filter(function(p) {
+            return p.point_name.toLowerCase().indexOf(search) >= 0 ||
+                   p.device_id.toLowerCase().indexOf(search) >= 0;
+        });
+    }
+    if (qualityFilter !== '') {
+        var q = parseInt(qualityFilter);
+        filtered = filtered.filter(function(p) { return p.quality === q; });
+    }
+
+    // 按设备ID和数据点名排序
+    filtered.sort(function(a, b) {
+        if (a.device_id !== b.device_id) return a.device_id.localeCompare(b.device_id);
+        return a.point_name.localeCompare(b.point_name);
+    });
+
+    var tbody = document.getElementById('dpTableBody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无数据</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(function(point) {
+        return '<tr>' +
+            '<td><code>' + point.device_id + '</code></td>' +
+            '<td>' + point.point_name + '</td>' +
+            '<td><strong>' + formatDpValue(point.value, point.data_type) + '</strong></td>' +
+            '<td><span class="badge bg-secondary">' + point.data_type + '</span></td>' +
+            '<td>' + formatDpQuality(point.quality) + '</td>' +
+            '<td>' + (point.update_count || 0) + '</td>' +
+            '<td>' + formatDpTime(point.timestamp) + '</td>' +
+            '</tr>';
+    }).join('');
+}
+
+// 格式化数据值
+function formatDpValue(value, dataType) {
+    if (value === null || value === undefined) return '-';
+    if (dataType === 'float32' || dataType === 'float64') {
+        return typeof value === 'number' ? value.toFixed(4) : value;
+    }
+    if (dataType === 'bool') return value ? 'TRUE' : 'FALSE';
+    return String(value);
+}
+
+// 格式化质量标签
+function formatDpQuality(quality) {
+    var map = {
+        0: { text: '良好', cls: 'bg-success', icon: 'check-circle' },
+        1: { text: '坏', cls: 'bg-danger', icon: 'x-circle' },
+        2: { text: '不确定', cls: 'bg-warning', icon: 'question-circle' },
+        3: { text: '超时', cls: 'bg-warning', icon: 'clock' },
+        4: { text: '断开', cls: 'bg-secondary', icon: 'wifi-off' }
+    };
+    var info = map[quality] || { text: '未知', cls: 'bg-secondary', icon: 'question' };
+    return '<span class="badge ' + info.cls + '"><i class="bi bi-' + info.icon + ' me-1"></i>' + info.text + '</span>';
+}
+
+// 格式化时间
+function formatDpTime(ts) {
+    if (!ts) return '-';
+    var d = new Date(ts);
+    return d.toLocaleTimeString('zh-CN');
+}
+
+// 设置自动刷新
+function setupDpAutoRefresh() {
+    var checkbox = document.getElementById('dpAutoRefresh');
+    var intervalSelect = document.getElementById('dpRefreshInterval');
+
+    function startRefresh() {
+        if (dpRefreshTimer) clearInterval(dpRefreshTimer);
+        var interval = parseInt(intervalSelect.value);
+        dpRefreshTimer = setInterval(loadDataPoolData, interval);
+        if (typeof pageIntervals !== 'undefined') {
+            pageIntervals.push(dpRefreshTimer);
+        }
+    }
+
+    checkbox.addEventListener('change', function() {
+        if (checkbox.checked) {
+            startRefresh();
+        } else {
+            if (dpRefreshTimer) clearInterval(dpRefreshTimer);
+        }
+    });
+
+    intervalSelect.addEventListener('change', function() {
+        if (checkbox.checked) startRefresh();
+    });
+
+    // 设备过滤变化时重新加载
+    document.getElementById('dpDeviceFilter').addEventListener('change', loadDataPoolData);
+
+    // 搜索和质量过滤变化时重新渲染（不重新请求）
+    document.getElementById('dpSearch').addEventListener('input', renderDataPoolTable);
+    document.getElementById('dpQualityFilter').addEventListener('change', renderDataPoolTable);
+
+    startRefresh();
+}
+
+// 手动刷新
+async function refreshDataPool() {
+    await loadDataPoolData();
+    showToast('数据池已刷新');
+}
+</script>

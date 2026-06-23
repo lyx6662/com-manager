@@ -7,35 +7,43 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="card text-center">
-            <div class="card-body">
+            <div class="card-body py-3">
                 <h5 class="card-title text-primary" id="totalDevices">0</h5>
-                <p class="card-text text-muted">设备总数</p>
+                <p class="card-text text-muted small">设备总数</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="card text-center">
-            <div class="card-body">
+            <div class="card-body py-3">
                 <h5 class="card-title text-success" id="onlineDevices">0</h5>
-                <p class="card-text text-muted">在线设备</p>
+                <p class="card-text text-muted small">在线设备</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="card text-center">
-            <div class="card-body">
+            <div class="card-body py-3">
                 <h5 class="card-title text-danger" id="offlineDevices">0</h5>
-                <p class="card-text text-muted">离线设备</p>
+                <p class="card-text text-muted small">离线设备</p>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card text-center">
-            <div class="card-body">
+            <div class="card-body py-3">
+                <h5 class="card-title text-info" id="poolPoints">0</h5>
+                <p class="card-text text-muted small">数据池数据点</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
                 <h5 class="card-title text-warning" id="alarmCount">0</h5>
-                <p class="card-text text-muted">未确认报警</p>
+                <p class="card-text text-muted small">未确认报警</p>
             </div>
         </div>
     </div>
@@ -96,6 +104,15 @@ async function loadDeviceStatus() {
             if (el) el.textContent = '离线: ' + (data.offline || 0);
         }
 
+        // 获取数据池统计
+        try {
+            var poolResult = await api('GET', '/datapool/stats');
+            if (poolResult && poolResult.code === 0) {
+                var poolEl = document.getElementById('poolPoints');
+                if (poolEl) poolEl.textContent = poolResult.data.total_points || 0;
+            }
+        } catch (e) {}
+
         // 获取未确认报警数量
         try {
             var alarmResult = await api('GET', '/alarm/stats');
@@ -115,34 +132,30 @@ async function loadDeviceStatus() {
 }
 
 function renderMonitorTable(devices) {
-    const tbody = document.getElementById('monitorTableBody');
+    var tbody = document.getElementById('monitorTableBody');
     if (devices.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无设备</td></tr>';
         return;
     }
 
-    tbody.innerHTML = devices.map(device => `
-        <tr>
-            <td><code>${device.id}</code></td>
-            <td>${device.name}</td>
-            <td>${formatStatus(device.online)}</td>
-            <td>${formatTime(device.last_poll)}</td>
-            <td>${device.error_count || 0}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary btn-action" onclick="viewDeviceData('${device.id}')">
-                    <i class="bi bi-eye"></i> 详情
-                </button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = devices.map(function(device) {
+        return '<tr>' +
+            '<td><code>' + device.id + '</code></td>' +
+            '<td>' + device.name + '</td>' +
+            '<td>' + formatStatus(device.online) + '</td>' +
+            '<td>' + formatTime(device.last_poll) + '</td>' +
+            '<td>' + (device.error_count || 0) + '</td>' +
+            '<td><button class="btn btn-sm btn-outline-primary btn-action" onclick="viewDeviceData(\'' + device.id + '\')"><i class="bi bi-eye"></i> 详情</button></td>' +
+            '</tr>';
+    }).join('');
 }
 
 async function viewDeviceData(id) {
     try {
-        const result = await api('GET', `/monitor/devices/${id}`);
+        // 使用 DataPool API 获取设备数据
+        var result = await api('GET', '/datapool/device/' + id);
         if (result && result.code === 0) {
-            const data = result.data;
-            showDeviceDataModal(id, data);
+            showDeviceDataModal(id, result.data);
         } else {
             showToast('获取设备数据失败', 'danger');
         }
@@ -153,60 +166,48 @@ async function viewDeviceData(id) {
 
 function showDeviceDataModal(deviceId, data) {
     // 移除已存在的模态框
-    const existingModal = document.getElementById('deviceDataModal');
+    var existingModal = document.getElementById('deviceDataModal');
     if (existingModal) existingModal.remove();
 
-    const status = data.status || {};
-    const points = data.points || {};
+    var points = data.points || [];
 
-    let pointsHtml = '';
-    if (Object.keys(points).length > 0) {
-        pointsHtml = '<table class="table table-sm"><thead><tr><th>数据点</th><th>值</th><th>质量</th><th>时间</th></tr></thead><tbody>';
-        for (const [name, point] of Object.entries(points)) {
-            // quality: 0=good, 1=bad, 2=uncertain, 3=timeout, 4=disconnected
-            const isGood = point.quality === 0 || point.quality === 'good';
-            const qualityLabel = isGood ? '好' : '坏';
-            const qualityClass = isGood ? 'bg-success' : 'bg-danger';
-            pointsHtml += `<tr>
-                <td>${name}</td>
-                <td>${point.value !== undefined ? point.value : '-'}</td>
-                <td><span class="badge ${qualityClass}">${qualityLabel}</span></td>
-                <td>${formatTime(point.timestamp)}</td>
-            </tr>`;
-        }
+    var pointsHtml = '';
+    if (points.length > 0) {
+        pointsHtml = '<table class="table table-sm"><thead><tr><th>数据点</th><th>值</th><th>数据类型</th><th>质量</th><th>更新次数</th><th>时间</th></tr></thead><tbody>';
+        points.forEach(function(point) {
+            var qualityMap = {
+                0: { text: '良好', cls: 'bg-success' },
+                1: { text: '坏', cls: 'bg-danger' },
+                2: { text: '不确定', cls: 'bg-warning' },
+                3: { text: '超时', cls: 'bg-warning' },
+                4: { text: '断开', cls: 'bg-secondary' }
+            };
+            var q = qualityMap[point.quality] || { text: '未知', cls: 'bg-secondary' };
+            pointsHtml += '<tr>' +
+                '<td>' + point.point_name + '</td>' +
+                '<td><strong>' + (point.value !== null && point.value !== undefined ? point.value : '-') + '</strong></td>' +
+                '<td><span class="badge bg-secondary">' + (point.data_type || '') + '</span></td>' +
+                '<td><span class="badge ' + q.cls + '">' + q.text + '</span></td>' +
+                '<td>' + (point.update_count || 0) + '</td>' +
+                '<td>' + formatTime(point.timestamp) + '</td>' +
+                '</tr>';
+        });
         pointsHtml += '</tbody></table>';
     } else {
         pointsHtml = '<p class="text-muted text-center py-3">暂无实时数据</p>';
     }
 
-    const modalHtml = `
-    <div class="modal fade" id="deviceDataModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">设备详情: ${deviceId}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row mb-3">
-                        <div class="col-6">
-                            <p><strong>状态:</strong> ${formatStatus(status.online)}</p>
-                            <p><strong>最后轮询:</strong> ${formatTime(status.last_poll)}</p>
-                        </div>
-                        <div class="col-6">
-                            <p><strong>错误次数:</strong> ${status.error_count || 0}</p>
-                            <p><strong>最后错误:</strong> ${status.last_error || '-'}</p>
-                        </div>
-                    </div>
-                    <h6>实时数据</h6>
-                    ${pointsHtml}
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                </div>
-            </div>
-        </div>
-    </div>`;
+    var modalHtml = '<div class="modal fade" id="deviceDataModal" tabindex="-1">' +
+        '<div class="modal-dialog modal-lg">' +
+        '<div class="modal-content">' +
+        '<div class="modal-header">' +
+        '<h5 class="modal-title">设备详情: ' + deviceId + ' (' + points.length + ' 个数据点)</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+        '</div>' +
+        '<div class="modal-body">' + pointsHtml + '</div>' +
+        '<div class="modal-footer">' +
+        '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>' +
+        '</div></div></div></div>';
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     new bootstrap.Modal(document.getElementById('deviceDataModal')).show();
