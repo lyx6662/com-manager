@@ -339,9 +339,23 @@ curl http://localhost:18080/api/v1/devices -H "Authorization: Bearer TOKEN"
 curl http://localhost:18080/api/v1/datapool -H "Authorization: Bearer TOKEN"
 ```
 
+## 第三方依赖
+
+- [libiec61850](https://github.com/mz-automation/libiec61850) - IEC 61850 协议库 (GPLv3 许可证)
+
 ## 许可证
 
-MIT License
+本项目采用 [GNU General Public License v3.0](LICENSE) 许可证。
+
+这是因为本项目使用了 libiec61850 库，该库采用 GPLv3 许可证。根据 GPLv3 的要求，任何链接了 GPLv3 库的程序都必须采用相同的许可证。
+
+### 许可证要求
+
+- ✅ 可以自由使用、修改和分发
+- ✅ 可以用于商业用途
+- ⚠️ 必须开源你的修改
+- ⚠️ 必须保留版权声明和许可证
+- ⚠️ 衍生作品必须采用 GPLv3 许可证
 
 ## 作者
 
