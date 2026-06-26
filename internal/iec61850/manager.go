@@ -194,9 +194,16 @@ func (m *Manager) Start() error {
 		port = 102
 	}
 
+	// 设置报告缓冲区大小，默认 65536
+	reportBufferSize := m.cfg.IEC61850.ReportBufferSize
+	if reportBufferSize == 0 {
+		reportBufferSize = 65536
+	}
+
 	srv := iec61850.NewServer(m.model, iec61850.ServerConfig{
-		TCPPort:        port,
-		MaxConnections: m.cfg.IEC61850.MaxConnections,
+		TCPPort:          port,
+		MaxConnections:   m.cfg.IEC61850.MaxConnections,
+		ReportBufferSize: reportBufferSize,
 	})
 	if srv == nil {
 		return fmt.Errorf("创建 IEC 61850 服务器失败")

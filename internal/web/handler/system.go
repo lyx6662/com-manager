@@ -64,8 +64,10 @@ func (h *SystemHandler) GetConfig(c *gin.Context) {
 // UpdateConfig 更新系统配置
 func (h *SystemHandler) UpdateConfig(c *gin.Context) {
 	var req struct {
-		Name     string `json:"name"`
-		LogLevel string `json:"log_level"`
+		Name        string `json:"name"`
+		LogLevel    string `json:"log_level"`
+		Password    string `json:"password"`
+		OldPassword string `json:"old_password"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -74,6 +76,23 @@ func (h *SystemHandler) UpdateConfig(c *gin.Context) {
 	}
 
 	cfg := h.cfgMgr.Get()
+
+	// 处理密码修改
+	if req.Password != "" {
+		// 验证旧密码
+		if req.OldPassword == "" || req.OldPassword != cfg.Web.Auth.Password {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "当前密码错误"})
+			return
+		}
+		// 验证新密码长度
+		if len(req.Password) < 6 {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "新密码长度不能少于6位"})
+			return
+		}
+		cfg.Web.Auth.Password = req.Password
+		h.log.Info("密码已更新")
+	}
+
 	if req.Name != "" {
 		cfg.Server.Name = req.Name
 	}

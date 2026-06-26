@@ -244,6 +244,17 @@ func (c *Collector) IsDeviceOnline(deviceID string) bool {
 	return false
 }
 
+// GetDevicePackets 获取设备的最近报文
+func (c *Collector) GetDevicePackets(deviceID string) interface{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	w, ok := c.devices[deviceID]
+	if !ok {
+		return nil
+	}
+	return w.collector.GetRecentPackets()
+}
+
 // IsOnline 设备是否在线
 func (s *DeviceStatus) IsOnline() bool {
 	return s.Online
@@ -616,15 +627,28 @@ func (c *Collector) pollDevice(w *deviceWorker) {
 
 	// 判断设备是否在线：至少有一个数据点读取成功
 	hasGoodData := false
+	goodCount := 0
+	badCount := 0
 	for _, pt := range points {
 		if pt.Quality == model.QualityGood {
 			hasGoodData = true
-			break
+			goodCount++
+		} else {
+			badCount++
 		}
 	}
 	c.statuses[w.deviceID].Online = hasGoodData
 
 	c.mu.Unlock()
+
+	// 采集结果日志（注释掉以减少日志量）
+	// c.log.Info("采集完成",
+	// 	"device_id", w.deviceID,
+	// 	"total", len(points),
+	// 	"good", goodCount,
+	// 	"bad", badCount,
+	// 	"online", hasGoodData,
+	// )
 
 	// 回调数据
 	if len(points) > 0 && c.onData != nil {

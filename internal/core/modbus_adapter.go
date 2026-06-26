@@ -1,6 +1,7 @@
 package core
 
 import (
+	// "fmt"
 	"math"
 	"sync"
 
@@ -184,11 +185,25 @@ func (a *ModbusOutputAdapter) OnDataChanged(deviceID string, pointName string, e
 		return
 	}
 
+	// a.log.Debug("Modbus 适配器收到数据变更",
+	// 	"device_id", deviceID,
+	// 	"point_name", pointName,
+	// 	"value", entry.Value,
+	// 	"quality", entry.Quality,
+	// 	"mappings_count", len(a.mappings),
+	// )
+
 	// 查找对应的映射规则
 	for _, mapping := range a.mappings {
 		if mapping.SourceDevice != deviceID || mapping.SourceName != pointName {
 			continue
 		}
+
+		// a.log.Debug("Modbus 适配器匹配到映射规则",
+		// 	"source_device", mapping.SourceDevice,
+		// 	"source_name", mapping.SourceName,
+		// 	"target_register", mapping.TargetRegister,
+		// )
 
 		// 处理批量类型
 		if mapping.DataType == "int32_dcba_batch" || mapping.DataType == "raw_batch" ||
@@ -292,45 +307,70 @@ func (a *ModbusOutputAdapter) BatchUpdatePoints(points []model.DataPoint) {
 
 // applyMapping 应用映射规则，将数据点值转换为寄存器值
 func (a *ModbusOutputAdapter) applyMapping(mapping ModbusOutputMapping, entry *DataPointEntry) []uint16 {
+	// a.log.Debug("applyMapping 开始",
+	// 	"data_type", entry.DataType,
+	// 	"value", entry.Value,
+	// 	"value_type", fmt.Sprintf("%T", entry.Value),
+	// 	"mapping_data_type", mapping.DataType,
+	// )
+
 	// 检查是否是直接透传的寄存器数据
 	if entry.DataType == "uint16_pair" || entry.DataType == "uint16" {
 		if v, ok := entry.Value.([]uint16); ok {
+			// a.log.Debug("applyMapping 返回 uint16 数组", "values", v)
 			return v
 		}
 		if v, ok := entry.Value.(uint16); ok {
+			// a.log.Debug("applyMapping 返回单个 uint16", "value", v)
 			return []uint16{v}
 		}
+		// a.log.Debug("applyMapping uint16 类型断言失败")
 		return nil
 	}
 
 	// 获取原始数值
 	rawValue := toFloat64(entry.Value)
 	if rawValue == nil {
+		// a.log.Debug("applyMapping toFloat64 返回 nil")
 		return nil
 	}
 
+	// a.log.Debug("applyMapping 原始值", "rawValue", *rawValue)
+
 	// 应用缩放和偏移
 	converted := *rawValue*mapping.Scale + mapping.Offset
+
+	// a.log.Debug("applyMapping 转换后", "converted", converted, "scale", mapping.Scale, "offset", mapping.Offset)
 
 	// 按数据类型编码为寄存器值
 	switch mapping.DataType {
 	case "float32":
 		bits := math.Float32bits(float32(converted))
-		return encodeModbusUint32(bits, mapping.ByteOrder)
+		result := encodeModbusUint32(bits, mapping.ByteOrder)
+		// a.log.Debug("applyMapping float32 结果", "bits", bits, "result", result)
+		return result
 	case "int32", "uint32":
 		v := uint32(int32(converted))
-		return encodeModbusUint32(v, mapping.ByteOrder)
+		result := encodeModbusUint32(v, mapping.ByteOrder)
+		// a.log.Debug("applyMapping int32 结果", "v", v, "result", result)
+		return result
 	case "int16":
-		return []uint16{uint16(int16(converted))}
+		result := []uint16{uint16(int16(converted))}
+		// a.log.Debug("applyMapping int16 结果", "result", result)
+		return result
 	case "uint16":
-		return []uint16{uint16(converted)}
+		result := []uint16{uint16(converted)}
+		// a.log.Debug("applyMapping uint16 结果", "result", result)
+		return result
 	case "bool":
 		if converted != 0 {
 			return []uint16{0xFF00}
 		}
 		return []uint16{0x0000}
 	default:
-		return []uint16{uint16(converted)}
+		result := []uint16{uint16(converted)}
+		// a.log.Debug("applyMapping 默认结果", "result", result)
+		return result
 	}
 }
 

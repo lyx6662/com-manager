@@ -16,15 +16,122 @@
                         <th>类型</th>
                         <th>协议</th>
                         <th>状态</th>
+                        <th>采集寄存器数</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="deviceTableBody">
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">加载中...</td>
+                        <td colspan="7" class="text-center text-muted py-4">加载中...</td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- 采集寄存器配置面板 -->
+<div id="registerConfigPanel" style="display:none;">
+    <div class="card mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-cpu me-2"></i>
+                采集寄存器配置 - <span id="rcDeviceId" class="text-primary"></span>
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary" onclick="closeRegisterPanel()">
+                <i class="bi bi-chevron-up me-1"></i>收起
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- 全局参数 -->
+            <div class="row mb-4">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">数据位宽</label>
+                    <select class="form-select" id="rcDataWidth" onchange="onDataWidthChange()">
+                        <option value="16">16位</option>
+                        <option value="32">32位</option>
+                        <option value="64">64位</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">功能码</label>
+                    <select class="form-select" id="rcSourceType" onchange="calcRegRange()">
+                        <option value="holding">03 保持寄存器</option>
+                        <option value="input">04 输入寄存器</option>
+                        <option value="coil">01 线圈</option>
+                        <option value="discrete">02 离散输入</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">数据格式</label>
+                    <select class="form-select" id="rcDataType">
+                        <option value="uint16">uint16</option>
+                        <option value="int16">int16</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">字节序</label>
+                    <select class="form-select" id="rcByteOrder">
+                        <option value="">ABCD (大端)</option>
+                        <option value="BADC">BADC (字交换)</option>
+                        <option value="CDAB">CDAB (字节交换)</option>
+                        <option value="DCBA">DCBA (小端)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">起始寄存器</label>
+                    <input type="number" class="form-control" id="rcRegStart" value="0" min="0" onchange="calcRegRange()">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">结束寄存器</label>
+                    <input type="number" class="form-control" id="rcRegEnd" value="9" min="0" onchange="calcRegRange()">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <small class="text-muted" id="rcRangeInfo">将生成 10 个数据点（寄存器 0~9，每个占 1 个地址）</small>
+                </div>
+            </div>
+
+            <!-- 寄存器列表 -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="bi bi-list-ul me-1"></i>寄存器列表</h6>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="addRegister()">
+                        <i class="bi bi-plus me-1"></i>添加
+                    </button>
+                    <button class="btn btn-sm btn-success" onclick="autoGenerateRegisters()">
+                        <i class="bi bi-magic me-1"></i>一键生成
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th style="width:50px">#</th>
+                            <th style="width:100px">地址</th>
+                            <th>名称</th>
+                            <th style="width:80px">功能码</th>
+                            <th style="width:100px">类型</th>
+                            <th style="width:80px">字节序</th>
+                            <th style="width:80px">缩放</th>
+                            <th style="width:80px">偏移</th>
+                            <th style="width:80px">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rcRegisterBody">
+                        <tr><td colspan="9" class="text-center text-muted py-3">请选择设备</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 保存按钮 -->
+            <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-primary" onclick="saveRegisterConfig()">
+                    <i class="bi bi-check-lg me-1"></i>保存配置
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -42,10 +149,6 @@
                     <div class="mb-3">
                         <label class="form-label">设备ID</label>
                         <input type="text" class="form-control" id="deviceId" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">设备名称</label>
-                        <input type="text" class="form-control" id="deviceName" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">设备类型</label>
@@ -149,9 +252,90 @@
     </div>
 </div>
 
+<!-- 寄存器编辑弹窗 -->
+<div class="modal fade" id="registerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="registerModalTitle">添加寄存器</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="registerForm">
+                    <div class="mb-3">
+                        <label class="form-label">寄存器地址</label>
+                        <input type="number" class="form-control" id="regAddr" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">名称</label>
+                        <input type="text" class="form-control" id="regName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">功能码</label>
+                        <select class="form-select" id="regSourceType">
+                            <option value="holding">03 保持寄存器</option>
+                            <option value="input">04 输入寄存器</option>
+                            <option value="coil">01 线圈</option>
+                            <option value="discrete">02 离散输入</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">数据类型</label>
+                        <select class="form-select" id="regDataType">
+                            <option value="uint16">uint16</option>
+                            <option value="int16">int16</option>
+                            <option value="uint32">uint32</option>
+                            <option value="int32">int32</option>
+                            <option value="float32">float32</option>
+                            <option value="float64">float64</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">字节序</label>
+                        <select class="form-select" id="regByteOrder">
+                            <option value="">ABCD (大端)</option>
+                            <option value="BADC">BADC (字交换)</option>
+                            <option value="CDAB">CDAB (字节交换)</option>
+                            <option value="DCBA">DCBA (小端)</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">缩放系数</label>
+                            <input type="number" class="form-control" id="regScale" value="1" step="0.01">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">偏移量</label>
+                            <input type="number" class="form-control" id="regOffset" value="0" step="0.01">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveRegister()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 var devices = [];
 var serialPorts = [];
+var selectedDeviceId = '';
+var deviceRegisters = [];
+var editingRegisterIndex = -1;
+var isEditingDevice = false;
+
+// 设备ID变化时同步设备名称（仅新增模式）
+document.addEventListener('DOMContentLoaded', function() {
+    var deviceIdInput = document.getElementById('deviceId');
+    if (deviceIdInput) {
+        deviceIdInput.addEventListener('input', function() {
+            // 设备名称已通过接口自动使用设备ID，无需同步
+        });
+    }
+});
 
 // 生成设备ID
 function generateDeviceId(type) {
@@ -202,7 +386,7 @@ function populateSerialPortSelect(currentPort) {
         }
         if (port.name === currentPort) {
             option.selected = true;
-            option.disabled = false; // 当前使用的端口可以选择
+            option.disabled = false;
         }
         select.appendChild(option);
     });
@@ -223,18 +407,20 @@ async function loadDevices() {
 function renderDeviceTable() {
     const tbody = document.getElementById('deviceTableBody');
     if (devices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无设备</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无设备</td></tr>';
         return;
     }
 
-    tbody.innerHTML = devices.map(device => `
-        <tr>
+    tbody.innerHTML = devices.map(device => {
+        const isSelected = device.id === selectedDeviceId;
+        return `<tr style="cursor:pointer;${isSelected ? 'background-color:#e8f4fd;' : ''}" onclick="selectDevice('${device.id}')">
             <td><code>${device.id}</code></td>
             <td>${device.name}</td>
             <td><span class="badge bg-${device.type === 'serial' ? 'info' : 'primary'}">${device.type === 'serial' ? '串口' : '网口'}</span></td>
             <td>${device.protocol}</td>
             <td>${formatStatus(device.online)}</td>
-            <td>
+            <td><span class="badge bg-secondary">${device.mapping_count || 0}</span></td>
+            <td onclick="event.stopPropagation()">
                 <button class="btn btn-sm btn-outline-primary btn-action" onclick="editDevice('${device.id}')">
                     <i class="bi bi-pencil"></i>
                 </button>
@@ -242,25 +428,325 @@ function renderDeviceTable() {
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
+}
+
+// 选择设备 - 展开寄存器配置
+async function selectDevice(deviceId) {
+    selectedDeviceId = deviceId;
+    renderDeviceTable();
+    await loadDeviceRegisters(deviceId);
+}
+
+// 关闭寄存器配置面板
+function closeRegisterPanel() {
+    selectedDeviceId = '';
+    document.getElementById('registerConfigPanel').style.display = 'none';
+    renderDeviceTable();
+}
+
+// 加载设备的寄存器配置
+async function loadDeviceRegisters(deviceId) {
+    try {
+        const result = await api('GET', '/datapoints/' + deviceId);
+        if (result && result.code === 0 && result.data && result.data.points) {
+            deviceRegisters = result.data.points.map(p => ({
+                name: p.name,
+                source_device: p.source_device,
+                source_register: p.source_register,
+                source_type: p.source_type,
+                data_type: p.data_type,
+                register_count: p.register_count,
+                byte_order: p.byte_order || '',
+                target_register: 0,
+                scale: 1,
+                offset: 0,
+                unit: ''
+            }));
+        } else {
+            deviceRegisters = [];
+        }
+    } catch (error) {
+        deviceRegisters = [];
+    }
+
+    // 更新面板
+    document.getElementById('rcDeviceId').textContent = deviceId;
+    detectDataWidth();
+    detectSourceType();
+    renderRegisterTable();
+    document.getElementById('registerConfigPanel').style.display = 'block';
+}
+
+// 检测数据位宽
+function detectDataWidth() {
+    if (deviceRegisters.length === 0) return;
+    const firstType = deviceRegisters[0].data_type || 'uint16';
+    if (firstType.includes('32') || firstType === 'float32') {
+        document.getElementById('rcDataWidth').value = '32';
+    } else if (firstType.includes('64') || firstType === 'float64') {
+        document.getElementById('rcDataWidth').value = '64';
+    } else {
+        document.getElementById('rcDataWidth').value = '16';
+    }
+    onDataWidthChange();
+    document.getElementById('rcDataType').value = firstType;
+    document.getElementById('rcByteOrder').value = deviceRegisters[0].byte_order || '';
+}
+
+// 检测功能码
+function detectSourceType() {
+    if (deviceRegisters.length === 0) return;
+    document.getElementById('rcSourceType').value = deviceRegisters[0].source_type || 'holding';
+}
+
+// 数据位宽变化
+function onDataWidthChange() {
+    const width = document.getElementById('rcDataWidth').value;
+    const typeSelect = document.getElementById('rcDataType');
+    const currentVal = typeSelect.value;
+
+    const options = {
+        '16': [{ value: 'uint16', text: 'uint16' }, { value: 'int16', text: 'int16' }],
+        '32': [{ value: 'uint32', text: 'uint32' }, { value: 'int32', text: 'int32' }, { value: 'float32', text: 'float32' }],
+        '64': [{ value: 'float64', text: 'float64' }, { value: 'int64', text: 'int64' }]
+    };
+
+    typeSelect.innerHTML = '';
+    (options[width] || options['16']).forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt.value;
+        el.textContent = opt.text;
+        typeSelect.appendChild(el);
+    });
+    calcRegRange();
+}
+
+// 计算寄存器区间信息
+function calcRegRange() {
+    const width = parseInt(document.getElementById('rcDataWidth').value);
+    const start = parseInt(document.getElementById('rcRegStart').value) || 0;
+    const end = parseInt(document.getElementById('rcRegEnd').value) || 0;
+    const regSize = width / 16; // 每个数据点占用的寄存器数
+
+    if (end < start) {
+        document.getElementById('rcRangeInfo').innerHTML = '<span class="text-danger">结束寄存器不能小于起始寄存器</span>';
+        return;
+    }
+
+    const totalRegs = end - start + 1;
+    const dataPoints = Math.floor(totalRegs / regSize);
+
+    if (dataPoints === 0) {
+        document.getElementById('rcRangeInfo').innerHTML = '<span class="text-danger">寄存器数量不足，' + width + '位数据至少需要 ' + regSize + ' 个寄存器</span>';
+        return;
+    }
+
+    const names = { 'holding': '03', 'input': '04', 'coil': '01', 'discrete': '02' };
+    const srcType = document.getElementById('rcSourceType').value;
+    const funcCode = names[srcType] || '03';
+
+    var info = '将生成 <strong>' + dataPoints + '</strong> 个数据点（寄存器 ' + start + '~' + end + '，共 ' + totalRegs + ' 个地址';
+    if (regSize > 1) {
+        info += '，每 ' + regSize + ' 个寄存器组成 1 个' + width + '位数据';
+    }
+    info += '，功能码 0x0' + funcCode + '）';
+    document.getElementById('rcRangeInfo').innerHTML = info;
+}
+
+// 渲染寄存器表格
+function renderRegisterTable() {
+    const tbody = document.getElementById('rcRegisterBody');
+
+    if (deviceRegisters.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">暂无寄存器，点击"一键生成"或"添加"</td></tr>';
+        return;
+    }
+
+    const sourceTypeMap = { 'holding': '03', 'input': '04', 'coil': '01', 'discrete': '02' };
+    const byteOrderMap = { '': 'ABCD', 'BADC': 'BADC', 'CDAB': 'CDAB', 'DCBA': 'DCBA' };
+    tbody.innerHTML = deviceRegisters.map((r, i) => {
+        return '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td><code>' + (r.source_register != null ? r.source_register : 0) + '</code></td>' +
+            '<td>' + (r.name || '') + '</td>' +
+            '<td><span class="badge bg-info">' + (sourceTypeMap[r.source_type] || '03') + '</span></td>' +
+            '<td><span class="badge bg-secondary">' + (r.data_type || 'uint16') + '</span></td>' +
+            '<td>' + (byteOrderMap[r.byte_order] || 'ABCD') + '</td>' +
+            '<td>' + (r.scale || 1) + '</td>' +
+            '<td>' + (r.offset || 0) + '</td>' +
+            '<td>' +
+                '<button class="btn btn-sm btn-outline-primary me-1" onclick="editRegister(' + i + ')"><i class="bi bi-pencil"></i></button>' +
+                '<button class="btn btn-sm btn-outline-danger" onclick="deleteRegister(' + i + ')"><i class="bi bi-trash"></i></button>' +
+            '</td>' +
+            '</tr>';
+    }).join('');
+}
+
+// 添加寄存器
+function addRegister() {
+    editingRegisterIndex = -1;
+    document.getElementById('registerModalTitle').textContent = '添加寄存器';
+    document.getElementById('registerForm').reset();
+    document.getElementById('regScale').value = '1';
+    document.getElementById('regOffset').value = '0';
+    document.getElementById('regAddr').value = deviceRegisters.length;
+    document.getElementById('regName').value = 'REG' + deviceRegisters.length;
+    document.getElementById('regSourceType').value = document.getElementById('rcSourceType').value;
+    document.getElementById('regDataType').value = document.getElementById('rcDataType').value;
+    document.getElementById('regByteOrder').value = document.getElementById('rcByteOrder').value;
+    new bootstrap.Modal(document.getElementById('registerModal')).show();
+}
+
+// 编辑寄存器
+function editRegister(index) {
+    editingRegisterIndex = index;
+    const r = deviceRegisters[index];
+    document.getElementById('registerModalTitle').textContent = '编辑寄存器';
+    document.getElementById('regAddr').value = r.source_register || 0;
+    document.getElementById('regName').value = r.name || '';
+    document.getElementById('regSourceType').value = r.source_type || 'holding';
+    document.getElementById('regDataType').value = r.data_type || 'uint16';
+    document.getElementById('regByteOrder').value = r.byte_order || '';
+    document.getElementById('regScale').value = r.scale || 1;
+    document.getElementById('regOffset').value = r.offset || 0;
+    new bootstrap.Modal(document.getElementById('registerModal')).show();
+}
+
+// 保存寄存器（弹窗）
+function saveRegister() {
+    const reg = {
+        name: document.getElementById('regName').value,
+        source_device: selectedDeviceId,
+        source_register: parseInt(document.getElementById('regAddr').value),
+        source_type: document.getElementById('regSourceType').value,
+        data_type: document.getElementById('regDataType').value,
+        register_count: 1,
+        target_register: 0,
+        scale: parseFloat(document.getElementById('regScale').value) || 1,
+        offset: parseFloat(document.getElementById('regOffset').value) || 0,
+        unit: '',
+        byte_order: document.getElementById('regByteOrder').value
+    };
+
+    if (editingRegisterIndex >= 0) {
+        deviceRegisters[editingRegisterIndex] = reg;
+    } else {
+        deviceRegisters.push(reg);
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
+    renderRegisterTable();
+}
+
+// 删除寄存器
+function deleteRegister(index) {
+    deviceRegisters.splice(index, 1);
+    renderRegisterTable();
+}
+
+// 一键生成寄存器（追加模式）
+function autoGenerateRegisters() {
+    const dataType = document.getElementById('rcDataType').value;
+    const sourceType = document.getElementById('rcSourceType').value;
+    const byteOrder = document.getElementById('rcByteOrder').value;
+    const deviceId = selectedDeviceId;
+    const start = parseInt(document.getElementById('rcRegStart').value) || 0;
+    const end = parseInt(document.getElementById('rcRegEnd').value) || 0;
+
+    if (end < start) {
+        showToast('结束寄存器不能小于起始寄存器', 'danger');
+        return;
+    }
+
+    // 每个数据点占用的寄存器数
+    const regSize = (dataType.includes('32') || dataType === 'float32') ? 2 :
+                    (dataType.includes('64') || dataType === 'float64') ? 4 : 1;
+
+    const totalRegs = end - start + 1;
+    const dataPoints = Math.floor(totalRegs / regSize);
+
+    if (dataPoints === 0) {
+        showToast('寄存器数量不足', 'danger');
+        return;
+    }
+
+    const shortName = deviceId.replace('-device', '').toUpperCase();
+    const srcNames = { 'holding': 'H', 'input': 'I', 'coil': 'C', 'discrete': 'D' };
+    const srcPrefix = srcNames[sourceType] || 'R';
+
+    // 计算当前最大的 target_register，自动递增
+    var nextTarget = 0;
+    deviceRegisters.forEach(function(r) {
+        var end = (r.target_register || 0) + (r.register_count || 1);
+        if (end > nextTarget) nextTarget = end;
+    });
+
+    // 生成数据点，追加到现有列表
+    for (let i = 0; i < dataPoints; i++) {
+        const regAddr = start + i * regSize;
+        deviceRegisters.push({
+            name: shortName + '-' + srcPrefix + regAddr,
+            source_device: deviceId,
+            source_register: regAddr,
+            source_type: sourceType,
+            data_type: dataType,
+            register_count: regSize,
+            target_register: nextTarget + i * regSize,
+            scale: 1,
+            offset: 0,
+            unit: '',
+            byte_order: byteOrder
+        });
+    }
+
+    renderRegisterTable();
+    showToast('已追加 ' + dataPoints + ' 个数据点（' + srcPrefix + start + '~' + srcPrefix + (start + dataPoints * regSize - 1) + '，输出寄存器 ' + nextTarget + '~' + (nextTarget + dataPoints * regSize - 1) + '）');
+}
+
+// 保存寄存器配置
+async function saveRegisterConfig() {
+    if (!selectedDeviceId) return;
+
+    try {
+        // 转换为采集点表格式
+        const points = deviceRegisters.map(r => ({
+            name: r.name,
+            source_register: r.source_register,
+            source_type: r.source_type,
+            data_type: r.data_type,
+            register_count: r.register_count,
+            byte_order: r.byte_order || ''
+        }));
+        const result = await api('PUT', '/datapoints/' + selectedDeviceId, points);
+        if (result && result.code === 0) {
+            showToast('寄存器配置保存成功');
+            await loadDevices();
+            // 重新加载寄存器配置面板
+            await loadDeviceRegisters(selectedDeviceId);
+        } else {
+            showToast(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 }
 
 async function showAddDevice() {
+    isEditingDevice = false;
     document.getElementById('deviceModalTitle').textContent = '新增设备';
     document.getElementById('deviceForm').reset();
 
-    // 自动生成设备ID
     const type = document.getElementById('deviceType').value;
-    document.getElementById('deviceId').value = generateDeviceId(type);
-    document.getElementById('deviceId').disabled = true;
+    const defaultId = generateDeviceId(type);
+    document.getElementById('deviceId').value = defaultId;
+    document.getElementById('deviceId').disabled = false;
 
-    // 设置默认值
     document.getElementById('pollInterval').value = '5s';
     document.getElementById('timeout').value = '3s';
     document.getElementById('deviceEnabled').checked = true;
 
-    // 加载串口列表
     await loadSerialPorts();
     populateSerialPortSelect('');
 
@@ -269,16 +755,15 @@ async function showAddDevice() {
 }
 
 async function editDevice(id) {
+    isEditingDevice = true;
     const device = devices.find(d => d.id === id);
     if (!device) return;
 
     document.getElementById('deviceModalTitle').textContent = '编辑设备';
     document.getElementById('deviceId').value = device.id;
     document.getElementById('deviceId').disabled = true;
-    document.getElementById('deviceName').value = device.name;
     document.getElementById('deviceType').value = device.type;
 
-    // 填充协议字段
     const protocolSelect = document.getElementById('deviceProtocol');
     protocolSelect.value = device.protocol || 'modbus_rtu';
 
@@ -286,7 +771,6 @@ async function editDevice(id) {
     document.getElementById('pollInterval').value = device.poll_interval || '5s';
     document.getElementById('timeout').value = device.timeout || '3s';
 
-    // 加载串口列表并填充串口设备字段
     if (device.type === 'serial') {
         await loadSerialPorts();
         populateSerialPortSelect(device.port || '');
@@ -297,7 +781,6 @@ async function editDevice(id) {
         document.getElementById('parity').value = device.parity || 'none';
     }
 
-    // 填充网口设备字段
     if (device.type === 'network') {
         document.getElementById('host').value = device.host || '';
         document.getElementById('netPort').value = device.port || 502;
@@ -313,8 +796,7 @@ function toggleConnectionFields() {
     document.getElementById('serialFields').style.display = type === 'serial' ? 'block' : 'none';
     document.getElementById('networkFields').style.display = type === 'network' ? 'block' : 'none';
 
-    // 新增模式下，切换类型时自动更新ID
-    if (!document.getElementById('deviceId').disabled || document.getElementById('deviceModalTitle').textContent === '新增设备') {
+    if (!isEditingDevice) {
         document.getElementById('deviceId').value = generateDeviceId(type);
     }
 }
@@ -322,7 +804,7 @@ function toggleConnectionFields() {
 async function saveDevice() {
     const data = {
         id: document.getElementById('deviceId').value,
-        name: document.getElementById('deviceName').value,
+        name: document.getElementById('deviceId').value,
         type: document.getElementById('deviceType').value,
         protocol: document.getElementById('deviceProtocol').value,
         enabled: document.getElementById('deviceEnabled').checked,
@@ -344,11 +826,10 @@ async function saveDevice() {
     }
 
     try {
-        const isEdit = document.getElementById('deviceId').disabled;
-        const url = isEdit ? `/devices/${data.id}` : '/devices';
-        const result = await api(isEdit ? 'PUT' : 'POST', url, data);
+        const url = isEditingDevice ? `/devices/${data.id}` : '/devices';
+        const result = await api(isEditingDevice ? 'PUT' : 'POST', url, data);
         if (result && result.code === 0) {
-            showToast(isEdit ? '更新成功' : '创建成功');
+            showToast(isEditingDevice ? '更新成功' : '创建成功');
             bootstrap.Modal.getInstance(document.getElementById('deviceModal')).hide();
             await loadDevices();
         } else {
@@ -366,6 +847,10 @@ async function deleteDevice(id) {
         const result = await api('DELETE', `/devices/${id}`);
         if (result && result.code === 0) {
             showToast('删除成功');
+            if (selectedDeviceId === id) {
+                selectedDeviceId = '';
+                document.getElementById('registerConfigPanel').style.display = 'none';
+            }
             await loadDevices();
         } else {
             showToast(result.message || '删除失败', 'danger');

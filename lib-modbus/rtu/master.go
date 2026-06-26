@@ -27,15 +27,17 @@ type MasterConfig struct {
 
 // Master Modbus RTU主站 (采集串口设备)
 type Master struct {
-	cfg           MasterConfig
-	log           *logger.Logger
-	mu            sync.Mutex
-	connected     bool
-	serialPort    serial.Port
-	lastConnState bool      // 上次连接状态，用于减少重复日志
-	failStartTime time.Time // 首次失败时间
-	failCount     int       // 连续失败次数
-	nextReconnect time.Time // 下次重连时间
+	cfg            MasterConfig
+	log            *logger.Logger
+	mu             sync.Mutex
+	connected      bool
+	serialPort     serial.Port
+	lastConnState  bool      // 上次连接状态，用于减少重复日志
+	failStartTime  time.Time // 首次失败时间
+	failCount      int       // 连续失败次数
+	nextReconnect  time.Time // 下次重连时间
+	lastError      error     // 上次连接错误，用于在重连等待期间返回
+	recentPackets  []modbus.PacketEntry // 最近报文缓冲区
 }
 
 // NewMaster 创建RTU主站
@@ -83,6 +85,9 @@ func (m *Master) Connect() error {
 
 	// 检查是否到了重连时间
 	if !m.nextReconnect.IsZero() && time.Now().Before(m.nextReconnect) {
+		if m.lastError != nil {
+			return m.lastError
+		}
 		return fmt.Errorf("等待重连时间")
 	}
 
@@ -111,7 +116,8 @@ func (m *Master) Connect() error {
 		m.failCount++
 		// 计算下次重连时间
 		m.nextReconnect = time.Now().Add(m.getReconnectInterval())
-		return fmt.Errorf("打开串口失败: %w", err)
+		m.lastError = fmt.Errorf("打开串口失败: %w", err)
+		return m.lastError
 	}
 
 	// 设置读超时
@@ -122,6 +128,7 @@ func (m *Master) Connect() error {
 	m.lastConnState = true
 	m.failCount = 0
 	m.nextReconnect = time.Time{}
+	m.lastError = nil
 	m.log.Info("串口设备连接成功", "device_id", m.cfg.DeviceID)
 	return nil
 }
@@ -360,6 +367,33 @@ func (m *Master) WriteMultipleRegisters(slaveID byte, startAddr uint16, values [
 	return err
 }
 
+// addPacket 添加报文到内存缓冲区（环形缓冲区，最多10条）
+func (m *Master) addPacket(direction string, data []byte) {
+	entry := modbus.PacketEntry{
+		Timestamp:   time.Now(),
+		Direction:   direction,
+		Data:        fmt.Sprintf("%X", data),
+		Length:      len(data),
+		Description: fmt.Sprintf("%s (%d字节)", direction, len(data)),
+	}
+	m.recentPackets = append(m.recentPackets, entry)
+	if len(m.recentPackets) > 10 {
+		m.recentPackets = m.recentPackets[len(m.recentPackets)-10:]
+	}
+}
+
+// GetRecentPackets 获取最近的报文记录
+func (m *Master) GetRecentPackets() []modbus.PacketEntry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.recentPackets) == 0 {
+		return nil
+	}
+	result := make([]modbus.PacketEntry, len(m.recentPackets))
+	copy(result, m.recentPackets)
+	return result
+}
+
 // sendRequest 发送请求并接收响应
 func (m *Master) sendRequest(request *modbus.RTUFrame) (*modbus.RTUFrame, error) {
 	m.mu.Lock()
@@ -371,6 +405,9 @@ func (m *Master) sendRequest(request *modbus.RTUFrame) (*modbus.RTUFrame, error)
 
 	// 编码请求
 	requestData := request.Encode()
+
+	// 记录发送报文 (含功能码信息)
+	m.addPacket(fmt.Sprintf("Tx FC=0x%02X SlaveID=%d", request.FunctionCode, request.SlaveID), requestData)
 
 	// 清空接收缓冲区
 	m.serialPort.ResetInputBuffer()
@@ -412,15 +449,25 @@ func (m *Master) sendRequest(request *modbus.RTUFrame) (*modbus.RTUFrame, error)
 				if expectedLen > 0 && totalRead >= expectedLen {
 					break // 帧已完整
 				}
-				// 等待 3.5 字符时间无新数据 = 帧结束
-				time.Sleep(charTime * 4)
-				extra, _ := m.serialPort.Read(buffer[totalRead:])
-				if extra == 0 {
-					break // 帧结束
+				// 如果无法确定帧长度（expectedLen==0），继续等待更多数据
+				if expectedLen == 0 {
+					// 等待一小段时间，让数据继续到达
+					time.Sleep(charTime * 2)
+					continue
 				}
-				totalRead += extra
-				break
+				// 帧长度已确定但数据不完整，继续读取剩余数据
+				// 计算还需要读取多少字节
+				remaining := expectedLen - totalRead
+				if remaining > 0 {
+					// 等待一小段时间，让剩余数据到达
+					time.Sleep(charTime * 2)
+					continue
+				}
 			}
+		}
+		// 如果没有读取到数据，短暂等待后继续
+		if n == 0 {
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
 
@@ -429,14 +476,21 @@ func (m *Master) sendRequest(request *modbus.RTUFrame) (*modbus.RTUFrame, error)
 
 	if totalRead < 5 {
 		if totalRead == 0 {
+			// 记录无响应
+			m.addPacket("Rx-EMPTY", []byte{})
 			return nil, fmt.Errorf("串口无响应，请检查串口连接或设备状态: %s", m.cfg.DeviceID)
 		}
+		m.addPacket("Rx-SHORT", buffer[:totalRead])
 		return nil, fmt.Errorf("响应数据太短: %d字节，期望至少5字节", totalRead)
 	}
+
+	// 记录接收报文
+	m.addPacket("Rx", buffer[:totalRead])
 
 	// 解析 RTU 帧
 	response, err := modbus.ParseRTUFrame(buffer[:totalRead])
 	if err != nil {
+		m.addPacket("Rx-ERR", buffer[:totalRead])
 		return nil, fmt.Errorf("解析响应帧失败: %w", err)
 	}
 
@@ -456,6 +510,10 @@ func (m *Master) expectedFrameLength(data []byte) int {
 		// 响应格式: SlaveID + FuncCode + ByteCount + Data + CRC(2)
 		if len(data) >= 3 {
 			byteCount := int(data[2])
+			// 如果字节数为0，可能是数据还未完全接收，返回0继续等待
+			if byteCount == 0 {
+				return 0
+			}
 			return 3 + byteCount + 2 // +2 for CRC
 		}
 	case modbus.FuncWriteSingleReg, modbus.FuncWriteSingleCoil:

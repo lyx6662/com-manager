@@ -8,4 +8,5 @@ type DeviceCollector interface {
 	ReadHoldingRegisters(slaveID byte, startAddr uint16, quantity uint16) ([]uint16, error)
 	ReadInputRegisters(slaveID byte, startAddr uint16, quantity uint16) ([]uint16, error)
 	ReadCoils(slaveID byte, startAddr uint16, quantity uint16) ([]bool, error)
+	GetRecentPackets() []PacketEntry
 }

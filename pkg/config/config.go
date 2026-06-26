@@ -15,8 +15,20 @@ type Config struct {
 	SerialDevices  []SerialDeviceConfig     `yaml:"serial_devices"`
 	NetworkDevices []NetworkDeviceConfig    `yaml:"network_devices"`
 	Outputs        OutputConfig             `yaml:"outputs"`
-	Mappings       map[string][]MappingRule `yaml:"mappings"` // key为设备ID，value为该设备的点表规则
+	Mappings       map[string][]MappingRule `yaml:"mappings"` // key为设备ID，value为该设备的点表规则 (内部使用，由 data_points + output_mappings 合并)
+	DataPoints     map[string][]DataPointDef `yaml:"data_points,omitempty"` // 采集定义 (gateway.yaml)
 	OfflineBuffer  OfflineBufferConfig      `yaml:"offline_buffer"`
+}
+
+// DataPointDef 数据点采集定义 (保存在 gateway.yaml)
+type DataPointDef struct {
+	Name           string `yaml:"name" json:"name"`
+	SourceDevice   string `yaml:"source_device" json:"source_device"`
+	SourceRegister uint16 `yaml:"source_register" json:"source_register"`
+	SourceType     string `yaml:"source_type" json:"source_type"`
+	DataType       string `yaml:"data_type" json:"data_type"`
+	RegisterCount  int    `yaml:"register_count" json:"register_count"`
+	ByteOrder      string `yaml:"byte_order" json:"byte_order"`
 }
 
 // ServerConfig 服务器配置
@@ -155,10 +167,30 @@ type MappingRule struct {
 
 // Manager 配置管理器
 type Manager struct {
-	path         string
-	cfg          *Config
-	iec61850Path string
-	iec61850Cfg  *ModbusToIEC61850Config
+	path           string
+	cfg            *Config
+	outputsPath    string // 输出配置文件路径
+	outputMappings map[string][]OutputMappingDef // 手动配置的输出映射 (与采集点表分离)
+	iec61850Path   string
+	iec61850Cfg    *ModbusToIEC61850Config
+}
+
+// outputData 输出配置数据 (用于 outputs.yaml 分离保存)
+type outputData struct {
+	Outputs         OutputConfig                  `yaml:"outputs"`
+	OutputMappings  map[string][]OutputMappingDef `yaml:"output_mappings"`
+}
+
+// OutputMappingDef 输出映射定义 (保存在 outputs.yaml)
+type OutputMappingDef struct {
+	Name           string  `yaml:"name" json:"name"`
+	TargetRegister uint16  `yaml:"target_register" json:"target_register"`
+	Scale          float64 `yaml:"scale" json:"scale"`
+	Offset         float64 `yaml:"offset" json:"offset"`
+	Unit           string  `yaml:"unit" json:"unit"`
+	MaxPoints      int     `yaml:"max_points" json:"max_points"`
+	HighLimit      float64 `yaml:"high_limit" json:"high_limit"`
+	LowLimit       float64 `yaml:"low_limit" json:"low_limit"`
 }
 
 // NewManager 创建配置管理器
@@ -168,7 +200,25 @@ func NewManager(path string) (*Manager, error) {
 		return nil, err
 	}
 
-	m := &Manager{path: path, cfg: cfg}
+	outputsPath := "./configs/outputs.yaml"
+	m := &Manager{path: path, cfg: cfg, outputsPath: outputsPath, outputMappings: make(map[string][]OutputMappingDef)}
+
+	// 加载输出配置文件
+	outputCfg, outErr := loadOutputFile(outputsPath)
+	if outErr != nil {
+		if os.IsNotExist(outErr) {
+			fmt.Fprintf(os.Stderr, "[INFO] 输出配置文件不存在: %s，将自动生成\n", outputsPath)
+			m.saveOutputs()
+		} else {
+			fmt.Fprintf(os.Stderr, "[WARN] 加载输出配置文件失败: %v\n", outErr)
+		}
+	} else {
+		cfg.Outputs = outputCfg.Outputs
+		// 保存手动配置的输出映射
+		m.outputMappings = outputCfg.OutputMappings
+		// 合并 data_points + output_mappings → mappings
+		m.mergeMappings(outputCfg)
+	}
 
 	// 尝试加载 IEC 61850 配置文件
 	iec61850Path := "./configs/modbus_to_61850.yaml"
@@ -200,9 +250,129 @@ func (m *Manager) Get() *Config {
 	return m.cfg
 }
 
-// Save 保存配置到文件
+// Save 保存配置到文件 (分离保存：采集定义 → gateway.yaml，输出配置 → outputs.yaml)
 func (m *Manager) Save() error {
-	return Save(m.path, m.cfg)
+	fmt.Fprintf(os.Stderr, "[DEBUG] Save() 被调用\n")
+	// 拆分 mappings → data_points + output_mappings
+	m.splitMappings()
+
+	// 临时清空 Mappings 和 Outputs，避免写入 gateway.yaml
+	savedMappings := m.cfg.Mappings
+	savedOutputs := m.cfg.Outputs
+	m.cfg.Mappings = nil
+	m.cfg.Outputs = OutputConfig{}
+
+	// 保存主配置（含 data_points，不含 outputs/mappings）
+	if err := Save(m.path, m.cfg); err != nil {
+		m.cfg.Mappings = savedMappings
+		m.cfg.Outputs = savedOutputs
+		return err
+	}
+
+	// 恢复
+	m.cfg.Mappings = savedMappings
+	m.cfg.Outputs = savedOutputs
+
+	// 保存输出配置（含 output_mappings）
+	fmt.Fprintf(os.Stderr, "[DEBUG] Save() 即将调用 saveOutputs()\n")
+	return m.saveOutputs()
+}
+
+// saveOutputs 保存输出配置到 outputs.yaml (只保存手动配置的输出映射，不从采集点表自动生成)
+func (m *Manager) saveOutputs() error {
+	fmt.Fprintf(os.Stderr, "[DEBUG] saveOutputs() 被调用, Outputs.Enabled=%v, OutputMappings数量=%d\n", m.cfg.Outputs.Enabled, len(m.outputMappings))
+	outputCfg := &outputData{
+		Outputs:        m.cfg.Outputs,
+		OutputMappings: m.outputMappings,
+	}
+	data, err := yaml.Marshal(outputCfg)
+	if err != nil {
+		return fmt.Errorf("序列化输出配置失败: %w", err)
+	}
+	if err := os.WriteFile(m.outputsPath, data, 0644); err != nil {
+		return fmt.Errorf("写入输出配置文件失败: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] saveOutputs() 写入文件成功: %s\n", m.outputsPath)
+	return nil
+}
+
+// splitMappings 将 Mappings 拆分为 DataPoints (采集定义)
+func (m *Manager) splitMappings() {
+	dataPoints := make(map[string][]DataPointDef)
+	for deviceID, rules := range m.cfg.Mappings {
+		for _, r := range rules {
+			dataPoints[deviceID] = append(dataPoints[deviceID], DataPointDef{
+				Name:           r.Name,
+				SourceDevice:   r.SourceDevice,
+				SourceRegister: r.SourceRegister,
+				SourceType:     r.SourceType,
+				DataType:       r.DataType,
+				RegisterCount:  r.RegisterCount,
+				ByteOrder:      r.ByteOrder,
+			})
+		}
+	}
+	m.cfg.DataPoints = dataPoints
+}
+
+// mergeMappings 将 DataPoints + OutputMappings 合并为 Mappings
+func (m *Manager) mergeMappings(outputCfg *outputData) {
+	// 构建 output_mappings 索引: deviceID.name → OutputMappingDef
+	outIndex := make(map[string]OutputMappingDef)
+	for deviceID, defs := range outputCfg.OutputMappings {
+		for _, d := range defs {
+			outIndex[deviceID+"."+d.Name] = d
+		}
+	}
+
+	// 只有在 output_mappings 中明确配置的数据点才会生成映射
+	mappings := make(map[string][]MappingRule)
+	for deviceID, points := range m.cfg.DataPoints {
+		for _, pt := range points {
+			// 检查是否在 output_mappings 中配置了这个数据点
+			out, ok := outIndex[deviceID+"."+pt.Name]
+			if !ok {
+				// 没有配置输出映射，跳过这个数据点
+				continue
+			}
+
+			scale := out.Scale
+			if scale == 0 {
+				scale = 1
+			}
+			rule := MappingRule{
+				Name:           pt.Name,
+				SourceDevice:   pt.SourceDevice,
+				SourceRegister: pt.SourceRegister,
+				SourceType:     pt.SourceType,
+				DataType:       pt.DataType,
+				RegisterCount:  pt.RegisterCount,
+				ByteOrder:      pt.ByteOrder,
+				TargetRegister: out.TargetRegister,
+				Scale:          scale,
+				Offset:         out.Offset,
+				Unit:           out.Unit,
+				MaxPoints:      out.MaxPoints,
+				HighLimit:      out.HighLimit,
+				LowLimit:       out.LowLimit,
+			}
+			mappings[deviceID] = append(mappings[deviceID], rule)
+		}
+	}
+	m.cfg.Mappings = mappings
+}
+
+// loadOutputFile 加载输出配置文件
+func loadOutputFile(path string) (*outputData, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	cfg := &outputData{}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("解析输出配置文件失败: %w", err)
+	}
+	return cfg, nil
 }
 
 // Load 加载配置文件
@@ -265,6 +435,7 @@ func (m *Manager) AddSerialDevice(dev SerialDeviceConfig) error {
 		return fmt.Errorf("设备已存在: %s", dev.ID)
 	}
 	m.cfg.SerialDevices = append(m.cfg.SerialDevices, dev)
+	fmt.Fprintf(os.Stderr, "[DEBUG] AddSerialDevice(%s) 调用 Save()\n", dev.ID)
 	return m.Save()
 }
 
@@ -409,6 +580,7 @@ func (m *Manager) DeleteModbusRTUServer(id string) error {
 func (m *Manager) SetOutputs(tcpServers []ModbusTCPServerConfig, rtuServers []ModbusRTUServerConfig) error {
 	m.cfg.Outputs.ModbusTCPServers = tcpServers
 	m.cfg.Outputs.ModbusRTUServers = rtuServers
+	fmt.Fprintf(os.Stderr, "[DEBUG] SetOutputs() 调用 Save(), TCP=%d, RTU=%d\n", len(tcpServers), len(rtuServers))
 	return m.Save()
 }
 
@@ -427,6 +599,76 @@ func (m *Manager) SetGroupDevices(groupID string, deviceIDs []string) error {
 	}
 	m.cfg.Outputs.GroupDevices[groupID] = deviceIDs
 	return m.Save()
+}
+
+// GetOutputMappings 获取所有手动配置的输出映射
+func (m *Manager) GetOutputMappings() map[string][]OutputMappingDef {
+	return m.outputMappings
+}
+
+// GetOutputMappingsByDevice 获取指定设备的输出映射
+func (m *Manager) GetOutputMappingsByDevice(deviceID string) []OutputMappingDef {
+	return m.outputMappings[deviceID]
+}
+
+// SetOutputMappingsByDevice 设置指定设备的输出映射
+func (m *Manager) SetOutputMappingsByDevice(deviceID string, mappings []OutputMappingDef) error {
+	m.outputMappings[deviceID] = mappings
+	return m.saveOutputs()
+}
+
+// DeleteOutputMappingsByDevice 删除指定设备的输出映射
+func (m *Manager) DeleteOutputMappingsByDevice(deviceID string) error {
+	delete(m.outputMappings, deviceID)
+	return m.saveOutputs()
+}
+
+// GetDataPoints 获取指定设备的采集点表
+func (m *Manager) GetDataPoints(deviceID string) []DataPointDef {
+	if m.cfg.DataPoints == nil {
+		return nil
+	}
+	return m.cfg.DataPoints[deviceID]
+}
+
+// SetDataPoints 设置指定设备的采集点表
+func (m *Manager) SetDataPoints(deviceID string, points []DataPointDef) error {
+	if m.cfg.DataPoints == nil {
+		m.cfg.DataPoints = make(map[string][]DataPointDef)
+	}
+	m.cfg.DataPoints[deviceID] = points
+	// 只保存 gateway.yaml，不保存 outputs.yaml
+	return m.saveGatewayOnly()
+}
+
+// DeleteDataPoints 删除指定设备的采集点表
+func (m *Manager) DeleteDataPoints(deviceID string) error {
+	if m.cfg.DataPoints == nil {
+		return nil
+	}
+	delete(m.cfg.DataPoints, deviceID)
+	return m.saveGatewayOnly()
+}
+
+// saveGatewayOnly 只保存 gateway.yaml，不保存 outputs.yaml
+func (m *Manager) saveGatewayOnly() error {
+	// 临时清空 Mappings 和 Outputs，避免写入 gateway.yaml
+	savedMappings := m.cfg.Mappings
+	savedOutputs := m.cfg.Outputs
+	m.cfg.Mappings = nil
+	m.cfg.Outputs = OutputConfig{}
+
+	// 保存主配置（含 data_points，不含 outputs/mappings）
+	if err := Save(m.path, m.cfg); err != nil {
+		m.cfg.Mappings = savedMappings
+		m.cfg.Outputs = savedOutputs
+		return err
+	}
+
+	// 恢复
+	m.cfg.Mappings = savedMappings
+	m.cfg.Outputs = savedOutputs
+	return nil
 }
 
 func setDefaults(cfg *Config) {
@@ -550,6 +792,16 @@ func (m *Manager) SetMappingRules(deviceID string, rules []MappingRule) error {
 		m.cfg.Mappings = make(map[string][]MappingRule)
 	}
 	m.cfg.Mappings[deviceID] = rules
+	fmt.Fprintf(os.Stderr, "[DEBUG] SetMappingRules(%s) 调用 Save(), rules数量=%d\n", deviceID, len(rules))
+	return m.Save()
+}
+
+// DeleteMappingRules 删除指定设备的映射规则
+func (m *Manager) DeleteMappingRules(deviceID string) error {
+	if m.cfg.Mappings == nil {
+		return nil
+	}
+	delete(m.cfg.Mappings, deviceID)
 	return m.Save()
 }
 

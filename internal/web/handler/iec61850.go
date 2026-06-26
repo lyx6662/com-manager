@@ -1020,6 +1020,43 @@ func (h *IEC61850Handler) GetMappings(c *gin.Context) {
 	})
 }
 
+// UpdateMappings 批量更新映射规则
+func (h *IEC61850Handler) UpdateMappings(c *gin.Context) {
+	var req []config.IEC61850MappingRule
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误: " + err.Error()})
+		return
+	}
+
+	cfg := h.cfgMgr.GetIEC61850Config()
+	if cfg == nil {
+		cfg = &config.ModbusToIEC61850Config{}
+	}
+
+	// 设置默认缩放值
+	for i := range req {
+		if req[i].Scale == 0 {
+			req[i].Scale = 1.0
+		}
+	}
+
+	cfg.Mappings = req
+
+	// 校验映射路径
+	if err := h.cfgMgr.ValidateIEC61850Mappings(cfg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+
+	if err := h.cfgMgr.SetIEC61850Config(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "保存失败: " + err.Error()})
+		return
+	}
+
+	h.log.Info("批量更新 IEC 61850 映射规则", "count", len(req))
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功"})
+}
+
 // AddMapping 新增映射规则
 func (h *IEC61850Handler) AddMapping(c *gin.Context) {
 	var req config.IEC61850MappingRule
@@ -1125,17 +1162,31 @@ func (h *IEC61850Handler) DeleteMapping(c *gin.Context) {
 // GetStatus 获取 IEC 61850 运行状态
 func (h *IEC61850Handler) GetStatus(c *gin.Context) {
 	cfg := h.cfgMgr.GetIEC61850Config()
-	enabled := cfg != nil && cfg.IEC61850.Enabled
+
+	if cfg == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"data": gin.H{
+				"enabled":            false,
+				"port":               0,
+				"ied_name":           "",
+				"max_connections":    0,
+				"active_connections": 0,
+				"mapping_count":      0,
+			},
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{
-			"enabled":          enabled,
-			"port":             cfg.IEC61850.Port,
-			"ied_name":         cfg.IEC61850.IEDName,
-			"max_connections":  cfg.IEC61850.MaxConnections,
-			"active_connections": 0, // TODO: 从 IEC 61850 管理器获取实际连接数
-			"mapping_count":    len(cfg.Mappings),
+			"enabled":            cfg.IEC61850.Enabled,
+			"port":               cfg.IEC61850.Port,
+			"ied_name":           cfg.IEC61850.IEDName,
+			"max_connections":    cfg.IEC61850.MaxConnections,
+			"active_connections": 0,
+			"mapping_count":      len(cfg.Mappings),
 		},
 	})
 }

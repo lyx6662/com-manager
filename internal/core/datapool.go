@@ -149,6 +149,14 @@ func (dp *DataPool) BatchUpdateData(deviceID string, points []model.DataPoint) {
 		entry.Timestamp = pt.Timestamp
 		entry.UpdateCount++
 
+		// dp.log.Debug("DataPool 更新数据",
+		// 	"device_id", deviceID,
+		// 	"point_name", pt.Name,
+		// 	"value", pt.Value,
+		// 	"data_count", len(dp.data),
+		// )
+		entry.UpdateCount++
+
 		// 收集需要通知的订阅者
 		for _, sub := range dp.subscribers {
 			if sub.allDevices || sub.pointIDs[key] {
@@ -187,11 +195,11 @@ func (dp *DataPool) GetData(deviceID, pointName string) (*DataPointEntry, bool) 
 }
 
 // GetDeviceData 获取设备的所有数据
-func (dp *DataPool) GetDeviceData(deviceID string) map[string]*DataPointEntry {
+func (dp *DataPool) GetDeviceData(deviceID string) map[string]interface{} {
 	dp.mu.RLock()
 	defer dp.mu.RUnlock()
 
-	result := make(map[string]*DataPointEntry)
+	result := make(map[string]interface{})
 	prefix := deviceID + "."
 	for key, entry := range dp.data {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
@@ -202,15 +210,60 @@ func (dp *DataPool) GetDeviceData(deviceID string) map[string]*DataPointEntry {
 	return result
 }
 
-// GetAllData 获取所有数据
-func (dp *DataPool) GetAllData() map[string]*DataPointEntry {
+// GetDeviceDataAsMap 获取设备的所有数据（返回 map 列表，用于 JSON 序列化）
+func (dp *DataPool) GetDeviceDataAsMap(deviceID string) []map[string]interface{} {
 	dp.mu.RLock()
 	defer dp.mu.RUnlock()
 
-	result := make(map[string]*DataPointEntry, len(dp.data))
+	result := make([]map[string]interface{}, 0)
+	prefix := deviceID + "."
+	for key, entry := range dp.data {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
+			result = append(result, map[string]interface{}{
+				"id":           entry.DeviceID + "." + entry.PointName,
+				"device_id":    entry.DeviceID,
+				"point_name":   entry.PointName,
+				"value":        entry.Value,
+				"quality":      entry.Quality,
+				"timestamp":    entry.Timestamp.UnixMilli(),
+				"data_type":    entry.DataType,
+				"update_count": entry.UpdateCount,
+			})
+		}
+	}
+	return result
+}
+
+// GetAllData 获取所有数据
+func (dp *DataPool) GetAllData() map[string]interface{} {
+	dp.mu.RLock()
+	defer dp.mu.RUnlock()
+
+	result := make(map[string]interface{}, len(dp.data))
 	for key, entry := range dp.data {
 		cp := *entry
 		result[key] = &cp
+	}
+	return result
+}
+
+// GetAllDataAsMap 获取所有数据（返回 map 列表，用于 JSON 序列化）
+func (dp *DataPool) GetAllDataAsMap() []map[string]interface{} {
+	dp.mu.RLock()
+	defer dp.mu.RUnlock()
+
+	result := make([]map[string]interface{}, 0, len(dp.data))
+	for _, entry := range dp.data {
+		result = append(result, map[string]interface{}{
+			"id":           entry.DeviceID + "." + entry.PointName,
+			"device_id":    entry.DeviceID,
+			"point_name":   entry.PointName,
+			"value":        entry.Value,
+			"quality":      entry.Quality,
+			"timestamp":    entry.Timestamp.UnixMilli(),
+			"data_type":    entry.DataType,
+			"update_count": entry.UpdateCount,
+		})
 	}
 	return result
 }

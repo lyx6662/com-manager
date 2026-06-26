@@ -107,9 +107,21 @@ func ParseRTUFrame(data []byte) (*RTUFrame, error) {
 		return nil, fmt.Errorf("RTU帧长度不足: %d", len(data))
 	}
 
+	// 过滤无效的从站ID（有效范围1-247）
+	slaveID := data[0]
+	if slaveID < 1 || slaveID > 247 {
+		return nil, fmt.Errorf("无效的从站ID: 0x%02X，可能是噪声数据", slaveID)
+	}
+
+	// 过滤无效的功能码（有效范围1-127）
+	funcCode := data[1]
+	if funcCode < 1 || funcCode > 127 {
+		return nil, fmt.Errorf("无效的功能码: 0x%02X，可能是噪声数据", funcCode)
+	}
+
 	frame := &RTUFrame{
-		SlaveID:      data[0],
-		FunctionCode: FunctionCode(data[1]),
+		SlaveID:      slaveID,
+		FunctionCode: FunctionCode(funcCode),
 		Data:         data[2 : len(data)-2],
 	}
 

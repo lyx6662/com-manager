@@ -1,4 +1,4 @@
-//go:build linux && !arm
+//go:build linux && arm
 
 package iec61850
 
@@ -12,6 +12,6 @@ package iec61850
 #cgo CFLAGS: -I${SRCDIR}/../third_party/libiec61850/src/logging
 #cgo CFLAGS: -I${SRCDIR}/../third_party/libiec61850/src/r_session
 
-#cgo LDFLAGS: -L${SRCDIR}/../build -liec61850-aarch64-musl -lhal-aarch64-musl -lm -lpthread -static
+#cgo LDFLAGS: -L${SRCDIR}/../build -liec61850-arm -lm -lpthread -static
 */
 import "C"

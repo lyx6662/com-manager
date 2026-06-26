@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lyx6662/com-manager/internal/storage/alarm"
@@ -42,19 +43,22 @@ type Server struct {
 	tokenMgr  *auth.TokenManager
 
 	// 处理器
-	deviceHandler   *handler.DeviceHandler
-	groupHandler    *handler.GroupHandler
-	mappingHandler  *handler.MappingHandler
-	outputHandler   *handler.OutputHandler
-	monitorHandler  *handler.MonitorHandler
-	alarmHandler    *handler.AlarmHandler
+	deviceHandler        *handler.DeviceHandler
+	groupHandler         *handler.GroupHandler
+	mappingHandler       *handler.MappingHandler
+	outputHandler        *handler.OutputHandler
+	monitorHandler       *handler.MonitorHandler
+	// alarmHandler    *handler.AlarmHandler  // 暂时禁用
 	bufferHandler   *handler.BufferHandler
-	systemHandler   *handler.SystemHandler
-	iec61850Handler *handler.IEC61850Handler
+	systemHandler        *handler.SystemHandler
+	iec61850Handler      *handler.IEC61850Handler
+	dataPoolHandler      *handler.DataPoolHandler
+	dataPointsHandler    *handler.DataPointsHandler
+	outputMappingsHandler *handler.OutputMappingsHandler
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfgMgr *config.Manager, log *logger.Logger, buf *buffer.OfflineBuffer, alarmStore *alarm.Store, collector interface{}, router interface{}, restartFunc func()) *Server {
+func NewServer(cfgMgr *config.Manager, log *logger.Logger, buf *buffer.OfflineBuffer, alarmStore *alarm.Store, collector interface{}, router interface{}, restartFunc func(), dataPool interface{}) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
 	s := &Server{
@@ -66,23 +70,30 @@ func NewServer(cfgMgr *config.Manager, log *logger.Logger, buf *buffer.OfflineBu
 		tokenMgr:   auth.NewTokenManager(cfgMgr.Get().Web.Auth.TokenSecret, 24),
 	}
 
-	s.initHandlers(collector, router, restartFunc)
+	s.initHandlers(collector, router, restartFunc, dataPool)
 	s.initRoutes()
 
 	return s
 }
 
 // initHandlers 初始化处理器
-func (s *Server) initHandlers(collector interface{}, router interface{}, restartFunc func()) {
+func (s *Server) initHandlers(collector interface{}, router interface{}, restartFunc func(), dataPool interface{}) {
 	s.deviceHandler = handler.NewDeviceHandler(s.cfgMgr, s.log, collector)
 	s.groupHandler = handler.NewGroupHandler(s.cfgMgr, s.log)
 	s.mappingHandler = handler.NewMappingHandler(s.cfgMgr, s.log)
 	s.outputHandler = handler.NewOutputHandler(s.cfgMgr, s.log)
 	s.monitorHandler = handler.NewMonitorHandler(s.log, collector, router)
-	s.alarmHandler = handler.NewAlarmHandler(s.log, s.alarmStore)
+	// s.alarmHandler = handler.NewAlarmHandler(s.log, s.alarmStore)    // 暂时禁用
 	s.bufferHandler = handler.NewBufferHandler(s.buf, s.log)
 	s.systemHandler = handler.NewSystemHandler(s.cfgMgr, s.log, restartFunc)
 	s.iec61850Handler = handler.NewIEC61850Handler(s.cfgMgr, s.log, restartFunc)
+	s.dataPointsHandler = handler.NewDataPointsHandler(s.cfgMgr, s.log)
+	s.outputMappingsHandler = handler.NewOutputMappingsHandler(s.cfgMgr, s.log)
+
+	// 数据池处理器
+	if pool, ok := dataPool.(handler.DataPoolProvider); ok {
+		s.dataPoolHandler = handler.NewDataPoolHandler(s.log, pool)
+	}
 }
 
 // initRoutes 初始化路由
@@ -174,6 +185,7 @@ func (s *Server) initRoutes() {
 				monitor.GET("/realtime", s.monitorHandler.GetRealtime)
 				monitor.GET("/devices", s.monitorHandler.GetDeviceStatus)
 				monitor.GET("/devices/:id", s.monitorHandler.GetDeviceData)
+				monitor.GET("/devices/:id/packets", s.monitorHandler.GetDevicePackets)
 			}
 
 			// 断点续传
@@ -188,13 +200,13 @@ func (s *Server) initRoutes() {
 				buffer.POST("/purge-transmitted", s.bufferHandler.PurgeTransmitted)
 			}
 
-			// 报警管理
-			alarm := protected.Group("/alarm")
-			{
-				alarm.GET("", s.alarmHandler.List)
-				alarm.PUT("/:id/ack", s.alarmHandler.Ack)
-				alarm.GET("/stats", s.alarmHandler.GetStats)
-			}
+			// 报警管理 - 暂时禁用
+			// alarm := protected.Group("/alarm")
+			// {
+			// 	alarm.GET("", s.alarmHandler.List)
+			// 	alarm.PUT("/:id/ack", s.alarmHandler.Ack)
+			// 	alarm.GET("/stats", s.alarmHandler.GetStats)
+			// }
 
 			// 系统管理
 			system := protected.Group("/system")
@@ -238,9 +250,37 @@ func (s *Server) initRoutes() {
 
 				// 映射规则
 				iec61850.GET("/mappings", s.iec61850Handler.GetMappings)
+				iec61850.PUT("/mappings", s.iec61850Handler.UpdateMappings)
 				iec61850.POST("/mappings", s.iec61850Handler.AddMapping)
 				iec61850.PUT("/mappings/:index", s.iec61850Handler.UpdateMapping)
 				iec61850.DELETE("/mappings/:index", s.iec61850Handler.DeleteMapping)
+			}
+
+			// 数据池
+			if s.dataPoolHandler != nil {
+				datapool := protected.Group("/datapool")
+				{
+					datapool.GET("", s.dataPoolHandler.GetAll)
+					datapool.GET("/stats", s.dataPoolHandler.GetStats)
+					datapool.GET("/device/:deviceId", s.dataPoolHandler.GetByDevice)
+				}
+			}
+
+			// 采集点表管理
+			datapoints := protected.Group("/datapoints")
+			{
+				datapoints.GET("/:deviceId", s.dataPointsHandler.GetByDevice)
+				datapoints.PUT("/:deviceId", s.dataPointsHandler.UpdateByDevice)
+				datapoints.DELETE("/:deviceId", s.dataPointsHandler.DeleteByDevice)
+			}
+
+			// 输出映射管理
+			outputMappings := protected.Group("/output-mappings")
+			{
+				outputMappings.GET("", s.outputMappingsHandler.GetAll)
+				outputMappings.GET("/:deviceId", s.outputMappingsHandler.GetByDevice)
+				outputMappings.PUT("/:deviceId", s.outputMappingsHandler.UpdateByDevice)
+				outputMappings.DELETE("/:deviceId", s.outputMappingsHandler.DeleteByDevice)
 			}
 		}
 	}
@@ -269,7 +309,7 @@ func (s *Server) Start() error {
 // Stop 停止服务器
 func (s *Server) Stop() error {
 	if s.server != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return s.server.Shutdown(ctx)
 	}

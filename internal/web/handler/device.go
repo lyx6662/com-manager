@@ -55,6 +55,7 @@ type DeviceResponse struct {
 	LastPoll     interface{} `json:"last_poll"`
 	ErrorCount   int    `json:"error_count"`
 	LastError    string `json:"last_error,omitempty"`
+	MappingCount int    `json:"mapping_count"`
 }
 
 // CreateDeviceRequest 创建设备请求
@@ -116,6 +117,7 @@ func (h *DeviceHandler) List(c *gin.Context) {
 	// 串口设备
 	for _, dev := range h.cfgMgr.Get().SerialDevices {
 		status := deviceStatuses[dev.ID]
+		dataPoints := h.cfgMgr.GetDataPoints(dev.ID)
 		devices = append(devices, DeviceResponse{
 			ID:           dev.ID,
 			Name:         dev.Name,
@@ -135,12 +137,14 @@ func (h *DeviceHandler) List(c *gin.Context) {
 			LastPoll:     status.lastPoll,
 			ErrorCount:   status.errorCount,
 			LastError:    status.lastError,
+			MappingCount: len(dataPoints),
 		})
 	}
 
 	// 网口设备
 	for _, dev := range h.cfgMgr.Get().NetworkDevices {
 		status := deviceStatuses[dev.ID]
+		dataPoints := h.cfgMgr.GetDataPoints(dev.ID)
 		devices = append(devices, DeviceResponse{
 			ID:           dev.ID,
 			Name:         dev.Name,
@@ -157,6 +161,7 @@ func (h *DeviceHandler) List(c *gin.Context) {
 			LastPoll:     status.lastPoll,
 			ErrorCount:   status.errorCount,
 			LastError:    status.lastError,
+			MappingCount: len(dataPoints),
 		})
 	}
 
@@ -301,7 +306,24 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 
 	req.ID = id
 
-	if req.Type == "serial" {
+	// 根据实际存在的设备类型来决定更新路径，而不是信任请求中的 type
+	existingType := ""
+	if h.cfgMgr.GetSerialDevice(id) != nil {
+		existingType = "serial"
+	} else if h.cfgMgr.GetNetworkDevice(id) != nil {
+		existingType = "network"
+	}
+
+	if existingType == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "设备不存在: " + id,
+		})
+		return
+	}
+
+	// 使用实际存在的设备类型，忽略请求中的 type
+	if existingType == "serial" {
 		dev := config.SerialDeviceConfig{
 			ID:           req.ID,
 			Name:         req.Name,
@@ -360,6 +382,8 @@ func (h *DeviceHandler) Delete(c *gin.Context) {
 
 	// 尝试删除串口设备
 	if err := h.cfgMgr.DeleteSerialDevice(id); err == nil {
+		// 连带删除该设备的映射规则
+		h.cfgMgr.DeleteMappingRules(id)
 		h.log.Info("删除串口设备", "id", id)
 		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
 		return
@@ -367,6 +391,8 @@ func (h *DeviceHandler) Delete(c *gin.Context) {
 
 	// 尝试删除网口设备
 	if err := h.cfgMgr.DeleteNetworkDevice(id); err == nil {
+		// 连带删除该设备的映射规则
+		h.cfgMgr.DeleteMappingRules(id)
 		h.log.Info("删除网口设备", "id", id)
 		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
 		return

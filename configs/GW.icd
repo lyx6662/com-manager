@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B">
-  <Header id="GW" version="1.0"></Header>
+  <Header id="GW_TEST" version="1.0"></Header>
   <Communication>
     <SubNetwork name="Ethernet" type="8-MMS">
-      <ConnectedAP iedName="GW" apName="S1">
+      <ConnectedAP iedName="GW_TEST" apName="S1">
         <Address>
           <P type="IP">127.0.0.1</P>
           <P type="IP-SUBNET">255.255.255.0</P>
@@ -15,7 +15,7 @@
       </ConnectedAP>
     </SubNetwork>
   </Communication>
-  <IED name="GW" type="com-manager" manufacturer="com-manager" configVersion="1.0">
+  <IED name="GW_TEST" type="com-manager" manufacturer="com-manager" configVersion="1.0">
     <Services>
       <GetDirectory></GetDirectory>
       <GetDataObjectDefinition></GetDataObjectDefinition>
@@ -30,50 +30,69 @@
       <Server>
         <Authentication none="true"></Authentication>
         <LDevice inst="WG">
-          <LN0 lnClass="LLN0" inst="" lnType="GWWG_LLN0"></LN0>
-          <LN lnClass="MMXU" inst="1" lnType="GWWG_MMXU1"></LN>
-          <LN lnClass="MMXU" inst="2" lnType="GWWG_MMXU2"></LN>
-          <LN lnClass="MMXU" inst="3" lnType="GWWG_MMXU3"></LN>
-          <LN lnClass="MMXU" inst="4" lnType="GWWG_MMXU4"></LN>
+          <LN0 lnClass="LLN0" inst="" lnType="GW_TESTWG_LLN0"></LN0>
+          <LN lnClass="MMXU" inst="1" lnType="GW_TESTWG_MMXU1"></LN>
+          <LN lnClass="MMXU" inst="2" lnType="GW_TESTWG_MMXU2"></LN>
+          <LN lnClass="MMXU" inst="3" lnType="GW_TESTWG_MMXU3"></LN>
+          <LN lnClass="MMXU" inst="4" lnType="GW_TESTWG_MMXU4"></LN>
         </LDevice>
       </Server>
     </AccessPoint>
   </IED>
   <DataTypeTemplates>
-    <LNodeType id="GWWG_LLN0" lnClass="LLN0">
+    <LNodeType id="GW_TESTWG_LLN0" lnClass="LLN0">
       <DO name="Mod" type="INC_Mod" cdc="INC"></DO>
       <DO name="Beh" type="INS_Beh" cdc="INS"></DO>
       <DO name="Health" type="INS_Health" cdc="INS"></DO>
       <DO name="NamPlt" type="LPL_NamPlt" cdc="LPL"></DO>
     </LNodeType>
-    <LNodeType id="GWWG_MMXU1" lnClass="MMXU">
+    <LNodeType id="GW_TESTWG_MMXU1" lnClass="MMXU">
       <DO name="TotW0" type="DO_WG_MMXU1_TotW0" cdc="CMV"></DO>
       <DO name="TotW1" type="DO_WG_MMXU1_TotW1" cdc="CMV"></DO>
       <DO name="TotW2" type="DO_WG_MMXU1_TotW2" cdc="CMV"></DO>
       <DO name="TotW3" type="DO_WG_MMXU1_TotW3" cdc="CMV"></DO>
       <DO name="TotW4" type="DO_WG_MMXU1_TotW4" cdc="CMV"></DO>
       <DO name="TotW5" type="DO_WG_MMXU1_TotW5" cdc="CMV"></DO>
+      <DO name="TotW6" type="DO_WG_MMXU1_TotW6" cdc="CMV"></DO>
+      <DO name="TotW7" type="DO_WG_MMXU1_TotW7" cdc="CMV"></DO>
+      <DO name="TotW8" type="DO_WG_MMXU1_TotW8" cdc="CMV"></DO>
+      <DO name="TotW9" type="DO_WG_MMXU1_TotW9" cdc="CMV"></DO>
     </LNodeType>
-    <LNodeType id="GWWG_MMXU2" lnClass="MMXU">
+    <LNodeType id="GW_TESTWG_MMXU2" lnClass="MMXU">
       <DO name="TotW0" type="DO_WG_MMXU2_TotW0" cdc="CMV"></DO>
       <DO name="TotW1" type="DO_WG_MMXU2_TotW1" cdc="CMV"></DO>
       <DO name="TotW2" type="DO_WG_MMXU2_TotW2" cdc="CMV"></DO>
       <DO name="TotW3" type="DO_WG_MMXU2_TotW3" cdc="CMV"></DO>
       <DO name="TotW4" type="DO_WG_MMXU2_TotW4" cdc="CMV"></DO>
+      <DO name="TotW5" type="DO_WG_MMXU2_TotW5" cdc="CMV"></DO>
+      <DO name="TotW6" type="DO_WG_MMXU2_TotW6" cdc="CMV"></DO>
+      <DO name="TotW7" type="DO_WG_MMXU2_TotW7" cdc="CMV"></DO>
+      <DO name="TotW8" type="DO_WG_MMXU2_TotW8" cdc="CMV"></DO>
+      <DO name="TotW9" type="DO_WG_MMXU2_TotW9" cdc="CMV"></DO>
     </LNodeType>
-    <LNodeType id="GWWG_MMXU3" lnClass="MMXU">
+    <LNodeType id="GW_TESTWG_MMXU3" lnClass="MMXU">
       <DO name="TotW0" type="DO_WG_MMXU3_TotW0" cdc="CMV"></DO>
       <DO name="TotW1" type="DO_WG_MMXU3_TotW1" cdc="CMV"></DO>
       <DO name="TotW2" type="DO_WG_MMXU3_TotW2" cdc="CMV"></DO>
       <DO name="TotW3" type="DO_WG_MMXU3_TotW3" cdc="CMV"></DO>
       <DO name="TotW4" type="DO_WG_MMXU3_TotW4" cdc="CMV"></DO>
+      <DO name="TotW5" type="DO_WG_MMXU3_TotW5" cdc="CMV"></DO>
+      <DO name="TotW6" type="DO_WG_MMXU3_TotW6" cdc="CMV"></DO>
+      <DO name="TotW7" type="DO_WG_MMXU3_TotW7" cdc="CMV"></DO>
+      <DO name="TotW8" type="DO_WG_MMXU3_TotW8" cdc="CMV"></DO>
+      <DO name="TotW9" type="DO_WG_MMXU3_TotW9" cdc="CMV"></DO>
     </LNodeType>
-    <LNodeType id="GWWG_MMXU4" lnClass="MMXU">
+    <LNodeType id="GW_TESTWG_MMXU4" lnClass="MMXU">
       <DO name="TotW0" type="DO_WG_MMXU4_TotW0" cdc="CMV"></DO>
       <DO name="TotW1" type="DO_WG_MMXU4_TotW1" cdc="CMV"></DO>
       <DO name="TotW2" type="DO_WG_MMXU4_TotW2" cdc="CMV"></DO>
       <DO name="TotW3" type="DO_WG_MMXU4_TotW3" cdc="CMV"></DO>
       <DO name="TotW4" type="DO_WG_MMXU4_TotW4" cdc="CMV"></DO>
+      <DO name="TotW5" type="DO_WG_MMXU4_TotW5" cdc="CMV"></DO>
+      <DO name="TotW6" type="DO_WG_MMXU4_TotW6" cdc="CMV"></DO>
+      <DO name="TotW7" type="DO_WG_MMXU4_TotW7" cdc="CMV"></DO>
+      <DO name="TotW8" type="DO_WG_MMXU4_TotW8" cdc="CMV"></DO>
+      <DO name="TotW9" type="DO_WG_MMXU4_TotW9" cdc="CMV"></DO>
     </LNodeType>
     <LNodeType id="INC_Mod" lnClass="">
       <DO name="stVal" type="INT32" cdc="INS"></DO>
@@ -146,6 +165,38 @@
     <DOType id="DO_WG_MMXU1_TotW5_mag" cdc="CMV">
       <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
     </DOType>
+    <DOType id="DO_WG_MMXU1_TotW6" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU1_TotW6_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW6_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW7" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU1_TotW7_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW7_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW8" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU1_TotW8_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW8_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW9" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU1_TotW9_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU1_TotW9_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
     <DOType id="DO_WG_MMXU2_TotW0" cdc="CMV">
       <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
       <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
@@ -184,6 +235,46 @@
       <SDO name="mag" type="DO_WG_MMXU2_TotW4_mag" cdc="CMV"></SDO>
     </DOType>
     <DOType id="DO_WG_MMXU2_TotW4_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW5" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU2_TotW5_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW5_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW6" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU2_TotW6_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW6_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW7" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU2_TotW7_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW7_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW8" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU2_TotW8_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW8_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW9" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU2_TotW9_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU2_TotW9_mag" cdc="CMV">
       <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
     </DOType>
     <DOType id="DO_WG_MMXU3_TotW0" cdc="CMV">
@@ -226,6 +317,46 @@
     <DOType id="DO_WG_MMXU3_TotW4_mag" cdc="CMV">
       <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
     </DOType>
+    <DOType id="DO_WG_MMXU3_TotW5" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU3_TotW5_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW5_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW6" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU3_TotW6_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW6_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW7" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU3_TotW7_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW7_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW8" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU3_TotW8_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW8_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW9" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU3_TotW9_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU3_TotW9_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
     <DOType id="DO_WG_MMXU4_TotW0" cdc="CMV">
       <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
       <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
@@ -264,6 +395,46 @@
       <SDO name="mag" type="DO_WG_MMXU4_TotW4_mag" cdc="CMV"></SDO>
     </DOType>
     <DOType id="DO_WG_MMXU4_TotW4_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW5" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU4_TotW5_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW5_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW6" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU4_TotW6_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW6_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW7" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU4_TotW7_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW7_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW8" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU4_TotW8_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW8_mag" cdc="CMV">
+      <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW9" cdc="CMV">
+      <DA name="q" bType="FLOAT32" fc="MX" qchg="true"></DA>
+      <DA name="t" bType="FLOAT32" fc="MX" dchg="true"></DA>
+      <SDO name="mag" type="DO_WG_MMXU4_TotW9_mag" cdc="CMV"></SDO>
+    </DOType>
+    <DOType id="DO_WG_MMXU4_TotW9_mag" cdc="CMV">
       <DA name="f" bType="FLOAT32" fc="MX" dchg="true"></DA>
     </DOType>
     <DOType id="INC_Mod" cdc="INC">

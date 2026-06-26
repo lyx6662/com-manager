@@ -33,6 +33,7 @@ type Client struct {
 	failStartTime time.Time // 首次失败时间
 	failCount     int       // 连续失败次数
 	nextReconnect time.Time // 下次重连时间
+	lastError     error     // 上次连接错误，用于在重连等待期间返回
 }
 
 // NewClient 创建TCP客户端
@@ -54,6 +55,9 @@ func (c *Client) Connect() error {
 
 	// 检查是否到了重连时间
 	if !c.nextReconnect.IsZero() && time.Now().Before(c.nextReconnect) {
+		if c.lastError != nil {
+			return c.lastError
+		}
 		return fmt.Errorf("等待重连时间")
 	}
 
@@ -75,7 +79,8 @@ func (c *Client) Connect() error {
 		c.failCount++
 		// 计算下次重连时间
 		c.nextReconnect = time.Now().Add(c.getReconnectInterval())
-		return fmt.Errorf("连接Modbus TCP设备失败: %w", err)
+		c.lastError = fmt.Errorf("连接Modbus TCP设备失败: %w", err)
+		return c.lastError
 	}
 
 	c.conn = conn
@@ -83,6 +88,7 @@ func (c *Client) Connect() error {
 	c.lastConnState = true
 	c.failCount = 0
 	c.nextReconnect = time.Time{}
+	c.lastError = nil
 	c.log.Info("Modbus TCP设备连接成功",
 		"device_id", c.cfg.DeviceID,
 		"addr", addr,
@@ -340,4 +346,9 @@ func (c *Client) sendRequest(request *modbus.TCPFrame) (*modbus.TCPFrame, error)
 func (c *Client) nextTransactionID() uint16 {
 	c.transaction++
 	return c.transaction
+}
+
+// GetRecentPackets 获取最近的报文记录（TCP客户端暂不记录报文）
+func (c *Client) GetRecentPackets() []modbus.PacketEntry {
+	return nil
 }

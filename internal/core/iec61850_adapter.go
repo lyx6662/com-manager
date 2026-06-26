@@ -143,8 +143,19 @@ func (a *IEC61850OutputAdapter) OnDataChanged(deviceID string, pointName string,
 	}
 
 	if a.iec61850Mgr == nil || !a.iec61850Mgr.IsRunning() {
+		a.log.Debug("IEC 61850 适配器未就绪",
+			"mgr_nil", a.iec61850Mgr == nil,
+		)
 		return
 	}
+
+	a.log.Debug("IEC 61850 收到数据变更",
+		"device_id", deviceID,
+		"point_name", pointName,
+		"value", entry.Value,
+		"quality", entry.Quality,
+		"mappings_count", len(a.mappings),
+	)
 
 	// 查找对应的映射规则
 	for _, rule := range a.mappings {
@@ -152,7 +163,16 @@ func (a *IEC61850OutputAdapter) OnDataChanged(deviceID string, pointName string,
 			continue
 		}
 
+		a.log.Debug("IEC 61850 匹配到映射规则",
+			"source_device", rule.SourceDevice,
+			"source_name", rule.SourceName,
+			"iec_path", rule.IEC61850Path,
+		)
+
 		if entry.Quality != model.QualityGood {
+			a.log.Debug("IEC 61850 跳过非优质数据",
+				"quality", entry.Quality,
+			)
 			continue
 		}
 
@@ -165,18 +185,24 @@ func (a *IEC61850OutputAdapter) OnDataChanged(deviceID string, pointName string,
 		// 应用缩放
 		scaledValue := a.applyScale(rule, entry.Value)
 		if scaledValue == nil {
+			a.log.Debug("IEC 61850 缩放后值为空")
 			continue
 		}
 
 		// 更新 IEC 61850 数据
 		now := time.Now().UnixMilli()
-		a.iec61850Mgr.UpdateData(rule.IEC61850Path, scaledValue, quality, now)
-
-		a.log.Debug("IEC 61850 转发数据",
-			"path", rule.IEC61850Path,
-			"value", scaledValue,
-			"quality", quality,
-		)
+		if err := a.iec61850Mgr.UpdateData(rule.IEC61850Path, scaledValue, quality, now); err != nil {
+			a.log.Error("IEC 61850 更新数据失败",
+				"path", rule.IEC61850Path,
+				"error", err,
+			)
+		} else {
+			// a.log.Info("IEC 61850 转发数据成功",
+			// 	"path", rule.IEC61850Path,
+			// 	"value", scaledValue,
+			// 	"quality", quality,
+			// )
+		}
 	}
 }
 

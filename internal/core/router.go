@@ -311,6 +311,7 @@ func (r *Router) refreshOutputs(deviceID string) {
 		return
 	}
 
+	forwardCount := 0
 	for _, rule := range rules {
 		pt, exists := r.dataCache[deviceID][rule.Name]
 
@@ -328,6 +329,7 @@ func (r *Router) refreshOutputs(deviceID string) {
 			if hasRTU {
 				rtuSrv.UpdateCoils(rule.TargetRegister, []bool{coilVal})
 			}
+			forwardCount++
 			continue
 		}
 
@@ -353,7 +355,19 @@ func (r *Router) refreshOutputs(deviceID string) {
 			if hasRTU {
 				rtuSrv.UpdateRegisters(rule.TargetRegister, regValues)
 			}
+			forwardCount++
 		}
+	}
+
+	if forwardCount > 0 {
+		r.log.Info("转发完成",
+			"device_id", deviceID,
+			"group", groupID,
+			"rules", len(rules),
+			"forwarded", forwardCount,
+			"tcp", hasTCP,
+			"rtu", hasRTU,
+		)
 	}
 }
 

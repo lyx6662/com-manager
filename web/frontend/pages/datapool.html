@@ -366,15 +366,22 @@ function renderDpDeviceTable(devices) {
 async function viewDevicePoints(deviceId) {
     try {
         var result = await api('GET', '/datapool/device/' + deviceId);
+        var packets = null;
+        try {
+            var pktResult = await api('GET', '/monitor/devices/' + deviceId + '/packets');
+            if (pktResult && pktResult.code === 0) {
+                packets = pktResult.data;
+            }
+        } catch (e) {}
         if (result && result.code === 0) {
-            showDevicePointsModal(deviceId, result.data);
+            showDevicePointsModal(deviceId, result.data, packets);
         }
     } catch (error) {
         showToast('获取设备数据失败', 'danger');
     }
 }
 
-function showDevicePointsModal(deviceId, data) {
+function showDevicePointsModal(deviceId, data, packets) {
     var existing = document.getElementById('devicePointsModal');
     if (existing) existing.remove();
 
@@ -393,9 +400,27 @@ function showDevicePointsModal(deviceId, data) {
         pointsHtml = '<p class="text-muted text-center py-3">暂无数据</p>';
     }
 
+    // 通信报文区域
+    var packetsHtml = '';
+    if (packets && packets.length > 0) {
+        packetsHtml = '<hr><h6><i class="bi bi-arrow-left-right me-1"></i>最近通信报文 (' + packets.length + ' 条)</h6>';
+        packetsHtml += '<div style="max-height:300px;overflow-y:auto;"><table class="table table-sm"><thead><tr><th>时间</th><th>方向</th><th>长度</th><th>数据(hex)</th></tr></thead><tbody>';
+        packets.forEach(function(pkt) {
+            var ts = pkt.timestamp ? new Date(pkt.timestamp).toLocaleTimeString('zh-CN', {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit', fractionalSecondDigits:3}) : '-';
+            var dirBadge = pkt.direction.indexOf('Tx') === 0 ? '<span class="badge bg-primary">' + pkt.direction + '</span>' : '<span class="badge bg-success">' + pkt.direction + '</span>';
+            var hexData = pkt.data || '-';
+            // 每2个hex字符（1字节）加一个空格
+            hexData = hexData.replace(/(.{2})/g, '$1 ').trim();
+            packetsHtml += '<tr><td><small>' + ts + '</small></td><td>' + dirBadge + '</td><td>' + pkt.length + '</td><td><code class="small">' + hexData + '</code></td></tr>';
+        });
+        packetsHtml += '</tbody></table></div>';
+    } else {
+        packetsHtml = '<hr><h6><i class="bi bi-arrow-left-right me-1"></i>最近通信报文</h6><p class="text-muted text-center py-2">暂无报文记录</p>';
+    }
+
     var modalHtml = '<div class="modal fade" id="devicePointsModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">' +
         '<div class="modal-header"><h5 class="modal-title">设备数据: ' + deviceId + ' (' + points.length + ' 个点)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
-        '<div class="modal-body">' + pointsHtml + '</div>' +
+        '<div class="modal-body">' + pointsHtml + packetsHtml + '</div>' +
         '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button></div>' +
         '</div></div></div>';
 

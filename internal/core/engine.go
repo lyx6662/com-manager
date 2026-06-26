@@ -6,13 +6,13 @@ import (
 	"math"
 	"os"
 	"sync"
-	"time"
+	// "time"  // 暂时禁用断点续传/报警，不再需要
 
 	"github.com/lyx6662/com-manager/lib-modbus/rtu"
 	"github.com/lyx6662/com-manager/lib-modbus/tcp"
 	"github.com/lyx6662/com-manager/internal/iec61850"
-	"github.com/lyx6662/com-manager/internal/storage/alarm"
-	"github.com/lyx6662/com-manager/internal/storage/buffer"
+	// "github.com/lyx6662/com-manager/internal/storage/alarm"   // 暂时禁用
+	// "github.com/lyx6662/com-manager/internal/storage/buffer"  // 暂时禁用
 	"github.com/lyx6662/com-manager/internal/web"
 	"github.com/lyx6662/com-manager/pkg/config"
 	"github.com/lyx6662/com-manager/pkg/logger"
@@ -29,10 +29,10 @@ type Engine struct {
 	wg           sync.WaitGroup
 
 	// 各管理器
-	webServer     *web.Server
-	offlineBuffer *buffer.OfflineBuffer
-	alarmStore    *alarm.Store            // 报警存储
-	alarmDetector *AlarmDetector          // 报警检测器
+	webServer *web.Server
+	// offlineBuffer *buffer.OfflineBuffer  // 暂时禁用
+	// alarmStore    *alarm.Store            // 暂时禁用
+	// alarmDetector *AlarmDetector          // 暂时禁用
 	tcpServers    map[string]*tcp.Server  // Modbus TCP 输出服务器
 	rtuServers    map[string]*rtu.Server  // Modbus RTU 输出服务器
 	router        *Router                 // 数据路由器 (保留用于向后兼容)
@@ -122,8 +122,8 @@ func (e *Engine) Start(ctx context.Context) error {
 		e.log.Info("Modbus 输出服务已禁用，跳过")
 	}
 
-	// 启动心跳更新
-	e.startHeartbeat()
+	// 启动心跳更新 - 暂时禁用
+	// e.startHeartbeat()
 
 	// 2.5 启动 IEC 61850 服务
 	if e.cfgMgr.IsIEC61850Enabled() {
@@ -143,8 +143,8 @@ func (e *Engine) Start(ctx context.Context) error {
 	// 3.6 初始化命令总线 (双向控制)
 	e.initCommandBus()
 
-	// 4. 初始化报警检测器
-	e.initAlarmDetector()
+	// 4. 初始化报警检测器 - 暂时禁用
+	// e.initAlarmDetector()
 
 	// 5. 启动采集调度器
 	if err := e.startCollector(); err != nil {
@@ -227,11 +227,12 @@ func (e *Engine) Stop() {
 		}
 	}
 
-	if e.offlineBuffer != nil {
-		if err := e.offlineBuffer.Close(); err != nil {
-			e.log.Error("关闭离线缓冲失败", "error", err)
-		}
-	}
+	// 离线缓冲暂时禁用
+	// if e.offlineBuffer != nil {
+	// 	if err := e.offlineBuffer.Close(); err != nil {
+	// 		e.log.Error("关闭离线缓冲失败", "error", err)
+	// 	}
+	// }
 
 	e.wg.Wait()
 	e.log.Info("引擎已停止")
@@ -353,11 +354,11 @@ func (e *Engine) Reload() error {
 	// 更新输出适配器配置
 	e.reloadOutputAdapters()
 
-	// 重新加载报警规则
-	if e.alarmDetector != nil {
-		e.alarmDetector.LoadRulesFromConfig(newCfg)
-		e.log.Info("报警规则已更新")
-	}
+	// 重新加载报警规则 - 暂时禁用
+	// if e.alarmDetector != nil {
+	// 	e.alarmDetector.LoadRulesFromConfig(newCfg)
+	// 	e.log.Info("报警规则已更新")
+	// }
 
 	e.log.Info("配置重载成功")
 	return nil
@@ -368,10 +369,10 @@ func (e *Engine) GetConfigManager() *config.Manager {
 	return e.cfgMgr
 }
 
-// GetOfflineBuffer 获取离线缓冲
-func (e *Engine) GetOfflineBuffer() *buffer.OfflineBuffer {
-	return e.offlineBuffer
-}
+// GetOfflineBuffer 获取离线缓冲 - 暂时禁用
+// func (e *Engine) GetOfflineBuffer() *buffer.OfflineBuffer {
+// 	return e.offlineBuffer
+// }
 
 // GetCollector 获取采集调度器
 func (e *Engine) GetCollector() *Collector {
@@ -386,60 +387,61 @@ func (e *Engine) GetRouter() *Router {
 func (e *Engine) initStorage() error {
 	e.log.Info("初始化存储...")
 
-	if e.cfg.OfflineBuffer.Enabled {
-		flushInterval, err := time.ParseDuration(e.cfg.OfflineBuffer.FlushInterval)
-		if err != nil {
-			flushInterval = 10 * time.Minute
-		}
-
-		buf, err := buffer.NewOfflineBuffer(
-			e.cfg.OfflineBuffer.DBPath,
-			e.cfg.OfflineBuffer.RetentionDays,
-			flushInterval,
-			e.log,
-		)
-		if err != nil {
-			return fmt.Errorf("初始化离线缓冲失败: %w", err)
-		}
-
-		// 设置刷盘条件：上位机未连接 且 底层设备已连接
-		buf.SetShouldFlush(func() (bool, string) {
-			// 检查是否有上位机在线
-			for groupID := range e.cfg.Mappings {
-				if e.isMasterConnected(groupID) {
-					return false, "上位机在线，不需要写入"
-				}
-			}
-
-			// 检查是否有底层设备在线
-			if e.collector != nil {
-				statuses := e.collector.GetAllDeviceStatus()
-				for _, s := range statuses {
-					if ds, ok := s.(*DeviceStatus); ok && ds.Online {
-						return true, "上位机未连接且设备在线"
-					}
-				}
-			}
-			return false, "底层设备全部离线"
-		})
-
-		e.offlineBuffer = buf
-		e.log.Info("离线缓冲初始化成功",
-			"path", e.cfg.OfflineBuffer.DBPath,
-			"retention_days", e.cfg.OfflineBuffer.RetentionDays,
-		)
-
-		// 初始化报警存储 (使用同一个数据库)
-		db := buf.GetDB()
-		if db != nil {
-			store, err := alarm.NewStore(db, e.log)
-			if err != nil {
-				return fmt.Errorf("初始化报警存储失败: %w", err)
-			}
-			e.alarmStore = store
-			e.log.Info("报警存储初始化成功")
-		}
-	}
+	// 离线缓冲和报警存储暂时禁用
+	// if e.cfg.OfflineBuffer.Enabled {
+	// 	flushInterval, err := time.ParseDuration(e.cfg.OfflineBuffer.FlushInterval)
+	// 	if err != nil {
+	// 		flushInterval = 10 * time.Minute
+	// 	}
+	//
+	// 	buf, err := buffer.NewOfflineBuffer(
+	// 		e.cfg.OfflineBuffer.DBPath,
+	// 		e.cfg.OfflineBuffer.RetentionDays,
+	// 		flushInterval,
+	// 		e.log,
+	// 	)
+	// 	if err != nil {
+	// 		return fmt.Errorf("初始化离线缓冲失败: %w", err)
+	// 	}
+	//
+	// 	// 设置刷盘条件：上位机未连接 且 底层设备已连接
+	// 	buf.SetShouldFlush(func() (bool, string) {
+	// 		// 检查是否有上位机在线
+	// 		for groupID := range e.cfg.Mappings {
+	// 			if e.isMasterConnected(groupID) {
+	// 				return false, "上位机在线，不需要写入"
+	// 			}
+	// 		}
+	//
+	// 		// 检查是否有底层设备在线
+	// 		if e.collector != nil {
+	// 			statuses := e.collector.GetAllDeviceStatus()
+	// 			for _, s := range statuses {
+	// 				if ds, ok := s.(*DeviceStatus); ok && ds.Online {
+	// 					return true, "上位机未连接且设备在线"
+	// 				}
+	// 			}
+	// 		}
+	// 		return false, "底层设备全部离线"
+	// 	})
+	//
+	// 	e.offlineBuffer = buf
+	// 	e.log.Info("离线缓冲初始化成功",
+	// 		"path", e.cfg.OfflineBuffer.DBPath,
+	// 		"retention_days", e.cfg.OfflineBuffer.RetentionDays,
+	// 	)
+	//
+	// 	// 初始化报警存储 (使用同一个数据库)
+	// 	db := buf.GetDB()
+	// 	if db != nil {
+	// 		store, err := alarm.NewStore(db, e.log)
+	// 		if err != nil {
+	// 			return fmt.Errorf("初始化报警存储失败: %w", err)
+	// 		}
+	// 		e.alarmStore = store
+	// 		e.log.Info("报警存储初始化成功")
+	// 	}
+	// }
 
 	return nil
 }
@@ -485,16 +487,16 @@ func (e *Engine) startTCPServer(cfg config.ModbusTCPServerConfig) error {
 
 	srv := tcp.NewServer(srvCfg, e.log)
 
-	// 设置断点续传回调
-	if e.offlineBuffer != nil {
-		srv.OnMasterConnected(func() {
-			e.log.Info("主机已连接，触发数据补传", "server", cfg.ID)
-			e.handleMasterConnected(cfg.ID)
-		})
-		srv.OnMasterDisconnected(func() {
-			e.log.Warn("主机断开连接", "server", cfg.ID)
-		})
-	}
+	// 设置断点续传回调 - 暂时禁用
+	// if e.offlineBuffer != nil {
+	// 	srv.OnMasterConnected(func() {
+	// 		e.log.Info("主机已连接，触发数据补传", "server", cfg.ID)
+	// 		e.handleMasterConnected(cfg.ID)
+	// 	})
+	// 	srv.OnMasterDisconnected(func() {
+	// 		e.log.Warn("主机断开连接", "server", cfg.ID)
+	// 	})
+	// }
 
 	if err := srv.Listen(); err != nil {
 		return err
@@ -527,16 +529,16 @@ func (e *Engine) startRTUServer(cfg config.ModbusRTUServerConfig) error {
 
 	srv := rtu.NewServer(srvCfg, e.log)
 
-	// 设置断点续传回调
-	if e.offlineBuffer != nil {
-		srv.OnMasterConnected(func() {
-			e.log.Info("RTU主机已连接，触发数据补传", "server", cfg.ID)
-			e.handleMasterConnected(cfg.ID)
-		})
-		srv.OnMasterDisconnected(func() {
-			e.log.Warn("RTU主机断开连接", "server", cfg.ID)
-		})
-	}
+	// 设置断点续传回调 - 暂时禁用
+	// if e.offlineBuffer != nil {
+	// 	srv.OnMasterConnected(func() {
+	// 		e.log.Info("RTU主机已连接，触发数据补传", "server", cfg.ID)
+	// 		e.handleMasterConnected(cfg.ID)
+	// 	})
+	// 	srv.OnMasterDisconnected(func() {
+	// 		e.log.Warn("RTU主机断开连接", "server", cfg.ID)
+	// 	})
+	// }
 
 	if err := srv.Listen(); err != nil {
 		return err
@@ -622,23 +624,41 @@ func (e *Engine) startCollector() error {
 
 // getDeviceMappings 获取指定设备的映射规则
 func (e *Engine) getDeviceMappings(deviceID string) []config.MappingRule {
-	if e.cfg.Mappings == nil {
+	// 从 DataPoints 获取采集点表
+	if e.cfg.DataPoints == nil {
 		return nil
 	}
-	return e.cfg.Mappings[deviceID]
-}
-
-// initAlarmDetector 初始化报警检测器
-func (e *Engine) initAlarmDetector() {
-	if e.alarmStore == nil {
-		return
+	points := e.cfg.DataPoints[deviceID]
+	if len(points) == 0 {
+		return nil
 	}
-
-	e.alarmDetector = NewAlarmDetector(e.log, e.alarmStore)
-	e.alarmDetector.LoadRulesFromConfig(e.cfg)
-
-	e.log.Info("报警检测器初始化完成")
+	// 将 DataPointDef 转换为 MappingRule
+	rules := make([]config.MappingRule, 0, len(points))
+	for _, pt := range points {
+		rules = append(rules, config.MappingRule{
+			Name:           pt.Name,
+			SourceDevice:   pt.SourceDevice,
+			SourceRegister: pt.SourceRegister,
+			SourceType:     pt.SourceType,
+			DataType:       pt.DataType,
+			RegisterCount:  pt.RegisterCount,
+			ByteOrder:      pt.ByteOrder,
+		})
+	}
+	return rules
 }
+
+// initAlarmDetector 初始化报警检测器 - 暂时禁用
+// func (e *Engine) initAlarmDetector() {
+// 	if e.alarmStore == nil {
+// 		return
+// 	}
+//
+// 	e.alarmDetector = NewAlarmDetector(e.log, e.alarmStore)
+// 	e.alarmDetector.LoadRulesFromConfig(e.cfg)
+//
+// 	e.log.Info("报警检测器初始化完成")
+// }
 
 // initOutputAdapters 初始化输出适配器
 func (e *Engine) initOutputAdapters() {
@@ -818,41 +838,41 @@ func (e *Engine) onDeviceData(deviceID string, points []model.DataPoint) {
 		e.router.UpdateDataCache(deviceID, points)
 	}
 
-	// 报警检测
-	if e.alarmDetector != nil {
-		e.alarmDetector.CheckDataPoints(deviceID, points)
-	}
+	// 报警检测 - 暂时禁用
+	// if e.alarmDetector != nil {
+	// 	e.alarmDetector.CheckDataPoints(deviceID, points)
+	// }
 
-	// 存入离线缓冲 (仅当设备连接成功且上位机未连接时)
-	if e.offlineBuffer != nil {
-		// 只缓存质量良好的数据
-		goodPoints := make([]model.DataPoint, 0, len(points))
-		for _, pt := range points {
-			if pt.Quality == model.QualityGood {
-				goodPoints = append(goodPoints, pt)
-			}
-		}
-
-		if len(goodPoints) > 0 {
-			storedGroups := make(map[string]bool)
-			for groupID, rules := range e.cfg.Mappings {
-				if storedGroups[groupID] {
-					continue
-				}
-				// 检查该分组是否有上位机在线
-				if e.isMasterConnected(groupID) {
-					continue // 上位机在线，不需要缓冲
-				}
-				for _, rule := range rules {
-					if rule.SourceDevice == deviceID {
-						e.offlineBuffer.StoreDataPoints(groupID, goodPoints)
-						storedGroups[groupID] = true
-						break
-					}
-				}
-			}
-		}
-	}
+	// 存入离线缓冲 (仅当设备连接成功且上位机未连接时) - 暂时禁用
+	// if e.offlineBuffer != nil {
+	// 	// 只缓存质量良好的数据
+	// 	goodPoints := make([]model.DataPoint, 0, len(points))
+	// 	for _, pt := range points {
+	// 		if pt.Quality == model.QualityGood {
+	// 			goodPoints = append(goodPoints, pt)
+	// 		}
+	// 	}
+	//
+	// 	if len(goodPoints) > 0 {
+	// 		storedGroups := make(map[string]bool)
+	// 		for groupID, rules := range e.cfg.Mappings {
+	// 			if storedGroups[groupID] {
+	// 				continue
+	// 			}
+	// 			// 检查该分组是否有上位机在线
+	// 			if e.isMasterConnected(groupID) {
+	// 				continue // 上位机在线，不需要缓冲
+	// 			}
+	// 			for _, rule := range rules {
+	// 				if rule.SourceDevice == deviceID {
+	// 					e.offlineBuffer.StoreDataPoints(groupID, goodPoints)
+	// 					storedGroups[groupID] = true
+	// 					break
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 }
 
 // isMasterConnected 检查指定分组的上位机是否在线（支持自动匹配唯一服务器）
@@ -887,78 +907,79 @@ func (e *Engine) isMasterConnected(groupID string) bool {
 }
 
 // handleMasterConnected 主机连接时触发数据补传
-func (e *Engine) handleMasterConnected(groupID string) {
-	if e.offlineBuffer == nil {
-		return
-	}
-
-	count, err := e.offlineBuffer.CountUntransmitted(groupID)
-	if err != nil {
-		e.log.Error("查询待补传数据量失败", "group_id", groupID, "error", err)
-		return
-	}
-
-	if count == 0 {
-		return
-	}
-
-	e.log.Info("开始数据补传", "group_id", groupID, "pending_count", count)
-
-	// 构建映射索引: deviceID+pointName -> MappingRule
-	mappingIndex := e.buildMappingIndex(groupID)
-
-	// 分批读取并补传
-	const batchSize = 200
-	var totalTransmitted int64
-
-	for {
-		records, err := e.offlineBuffer.LoadUntransmitted(groupID, batchSize)
-		if err != nil {
-			e.log.Error("读取待补传数据失败", "group_id", groupID, "error", err)
-			break
-		}
-		if len(records) == 0 {
-			break
-		}
-
-		ids := make([]int64, 0, len(records))
-		for _, rec := range records {
-			key := rec.DeviceID + "." + rec.PointName
-			rule, ok := mappingIndex[key]
-			if !ok {
-				// 没有映射规则，跳过但仍标记为已传
-				ids = append(ids, rec.ID)
-				continue
-			}
-
-			// 反序列化值并写入输出寄存器
-			val := buffer.DeserializeValue(rec.Value, rec.DataType)
-			if val == nil {
-				ids = append(ids, rec.ID)
-				continue
-			}
-
-			e.writeValueToOutputs(groupID, rule, val)
-			ids = append(ids, rec.ID)
-		}
-
-		// 批量标记已补传
-		if len(ids) > 0 {
-			if err := e.offlineBuffer.MarkTransmitted(ids); err != nil {
-				e.log.Error("标记已补传失败", "group_id", groupID, "error", err)
-				break
-			}
-			totalTransmitted += int64(len(ids))
-		}
-
-		// 不足一批说明已读完
-		if len(records) < batchSize {
-			break
-		}
-	}
-
-	e.log.Info("数据补传完成", "group_id", groupID, "transmitted", totalTransmitted)
-}
+// handleMasterConnected 处理上位机连接事件，触发数据补传 - 暂时禁用
+// func (e *Engine) handleMasterConnected(groupID string) {
+// 	if e.offlineBuffer == nil {
+// 		return
+// 	}
+//
+// 	count, err := e.offlineBuffer.CountUntransmitted(groupID)
+// 	if err != nil {
+// 		e.log.Error("查询待补传数据量失败", "group_id", groupID, "error", err)
+// 		return
+// 	}
+//
+// 	if count == 0 {
+// 		return
+// 	}
+//
+// 	e.log.Info("开始数据补传", "group_id", groupID, "pending_count", count)
+//
+// 	// 构建映射索引: deviceID+pointName -> MappingRule
+// 	mappingIndex := e.buildMappingIndex(groupID)
+//
+// 	// 分批读取并补传
+// 	const batchSize = 200
+// 	var totalTransmitted int64
+//
+// 	for {
+// 		records, err := e.offlineBuffer.LoadUntransmitted(groupID, batchSize)
+// 		if err != nil {
+// 			e.log.Error("读取待补传数据失败", "group_id", groupID, "error", err)
+// 			break
+// 		}
+// 		if len(records) == 0 {
+// 			break
+// 		}
+//
+// 		ids := make([]int64, 0, len(records))
+// 		for _, rec := range records {
+// 			key := rec.DeviceID + "." + rec.PointName
+// 			rule, ok := mappingIndex[key]
+// 			if !ok {
+// 				// 没有映射规则，跳过但仍标记为已传
+// 				ids = append(ids, rec.ID)
+// 				continue
+// 			}
+//
+// 			// 反序列化值并写入输出寄存器
+// 			val := buffer.DeserializeValue(rec.Value, rec.DataType)
+// 			if val == nil {
+// 				ids = append(ids, rec.ID)
+// 				continue
+// 			}
+//
+// 			e.writeValueToOutputs(groupID, rule, val)
+// 			ids = append(ids, rec.ID)
+// 		}
+//
+// 		// 批量标记已补传
+// 		if len(ids) > 0 {
+// 			if err := e.offlineBuffer.MarkTransmitted(ids); err != nil {
+// 				e.log.Error("标记已补传失败", "group_id", groupID, "error", err)
+// 				break
+// 			}
+// 			totalTransmitted += int64(len(ids))
+// 		}
+//
+// 		// 不足一批说明已读完
+// 		if len(records) < batchSize {
+// 			break
+// 		}
+// 	}
+//
+// 	e.log.Info("数据补传完成", "group_id", groupID, "transmitted", totalTransmitted)
+// }
 
 // buildMappingIndex 构建 deviceID.pointName -> MappingRule 的索引
 func (e *Engine) buildMappingIndex(groupID string) map[string]config.MappingRule {
@@ -1119,7 +1140,7 @@ func (e *Engine) startWebServer() error {
 		os.Exit(0)
 	}
 
-	e.webServer = web.NewServer(e.cfgMgr, e.log, e.offlineBuffer, e.alarmStore, e.collector, e.router, restartFunc)
+	e.webServer = web.NewServer(e.cfgMgr, e.log, nil, nil, e.collector, e.router, restartFunc, e.dataPool)
 	if err := e.webServer.Start(); err != nil {
 		return fmt.Errorf("启动Web服务失败: %w", err)
 	}
@@ -1130,29 +1151,29 @@ func (e *Engine) startWebServer() error {
 	return nil
 }
 
-// startHeartbeat 启动心跳更新 goroutine，每 10 秒写入当前时间到 SQLite
-func (e *Engine) startHeartbeat() {
-	if e.offlineBuffer == nil {
-		return
-	}
-
-	e.wg.Add(1)
-	go func() {
-		defer e.wg.Done()
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-
-		// 启动时立即写入一次
-		e.offlineBuffer.UpdateHeartbeat()
-		e.log.Info("心跳服务启动")
-
-		for {
-			select {
-			case <-e.ctx.Done():
-				return
-			case <-ticker.C:
-				e.offlineBuffer.UpdateHeartbeat()
-			}
-		}
-	}()
-}
+// startHeartbeat 启动心跳更新 goroutine，每 10 秒写入当前时间到 SQLite - 暂时禁用
+// func (e *Engine) startHeartbeat() {
+// 	if e.offlineBuffer == nil {
+// 		return
+// 	}
+//
+// 	e.wg.Add(1)
+// 	go func() {
+// 		defer e.wg.Done()
+// 		ticker := time.NewTicker(10 * time.Second)
+// 		defer ticker.Stop()
+//
+// 		// 启动时立即写入一次
+// 		e.offlineBuffer.UpdateHeartbeat()
+// 		e.log.Info("心跳服务启动")
+//
+// 		for {
+// 			select {
+// 			case <-e.ctx.Done():
+// 				return
+// 			case <-ticker.C:
+// 				e.offlineBuffer.UpdateHeartbeat()
+// 			}
+// 		}
+// 	}()
+// }

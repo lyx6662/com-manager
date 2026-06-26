@@ -13,6 +13,11 @@ type MonitorCollector interface {
 	GetAllDeviceStatus() map[string]interface{}
 }
 
+// PacketProvider 报文数据提供者接口
+type PacketProvider interface {
+	GetDevicePackets(deviceID string) interface{}
+}
+
 // MonitorRouter 监控用路由器接口
 type MonitorRouter interface {
 	GetDeviceStatus() map[string]map[string]interface{}
@@ -20,9 +25,10 @@ type MonitorRouter interface {
 
 // MonitorHandler 实时监控处理器
 type MonitorHandler struct {
-	log       *logger.Logger
-	collector MonitorCollector
-	router    MonitorRouter
+	log            *logger.Logger
+	collector      MonitorCollector
+	router         MonitorRouter
+	packetProvider PacketProvider
 }
 
 // NewMonitorHandler 创建监控处理器
@@ -34,6 +40,9 @@ func NewMonitorHandler(log *logger.Logger, collector interface{}, router interfa
 	}
 	if r, ok := router.(MonitorRouter); ok {
 		h.router = r
+	}
+	if p, ok := collector.(PacketProvider); ok {
+		h.packetProvider = p
 	}
 
 	return h
@@ -133,5 +142,25 @@ func (h *MonitorHandler) GetDeviceStatus(c *gin.Context) {
 			"online":  online,
 			"offline": offline,
 		},
+	})
+}
+
+// GetDevicePackets 获取设备的最近通信报文
+func (h *MonitorHandler) GetDevicePackets(c *gin.Context) {
+	deviceID := c.Param("id")
+
+	if h.packetProvider == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"data": nil,
+		})
+		return
+	}
+
+	packets := h.packetProvider.GetDevicePackets(deviceID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"data": packets,
 	})
 }

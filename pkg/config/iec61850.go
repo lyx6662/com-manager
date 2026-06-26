@@ -10,11 +10,12 @@ import (
 
 // IEC61850Config IEC 61850 服务器配置
 type IEC61850Config struct {
-	Enabled        bool   `yaml:"enabled" json:"enabled"`
-	Port           int    `yaml:"port" json:"port"`
-	IEDName        string `yaml:"ied_name" json:"ied_name"`
-	MaxConnections int    `yaml:"max_connections" json:"max_connections"`
-	ICDOutput      string `yaml:"icd_output" json:"icd_output"` // ICD 文件输出路径
+	Enabled           bool   `yaml:"enabled" json:"enabled"`
+	Port              int    `yaml:"port" json:"port"`
+	IEDName           string `yaml:"ied_name" json:"ied_name"`
+	MaxConnections    int    `yaml:"max_connections" json:"max_connections"`
+	ReportBufferSize  int    `yaml:"report_buffer_size" json:"report_buffer_size"` // 报告缓冲区大小，0表示默认
+	ICDOutput         string `yaml:"icd_output" json:"icd_output"` // ICD 文件输出路径
 }
 
 // IEC61850ModelConfig 数据模型配置

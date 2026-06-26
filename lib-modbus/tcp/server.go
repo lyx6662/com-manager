@@ -264,11 +264,11 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		// 组合完整帧
 		fullFrame := append(header, body...)
-		s.log.Debug("收到原始数据",
-			"header", fmt.Sprintf("%X", header),
-			"body", fmt.Sprintf("%X", body),
-			"full", fmt.Sprintf("%X", fullFrame),
-		)
+		// s.log.Debug("收到原始数据",
+		// 	"header", fmt.Sprintf("%X", header),
+		// 	"body", fmt.Sprintf("%X", body),
+		// 	"full", fmt.Sprintf("%X", fullFrame),
+		// )
 		tcpFrame, err := modbus.ParseTCPFrame(fullFrame)
 		if err != nil {
 			s.log.Warn("解析TCP帧失败", "error", err)
@@ -276,31 +276,31 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		// 处理请求
-		s.log.Debug("收到Modbus请求",
-			"transaction_id", tcpFrame.TransactionID,
-			"function_code", tcpFrame.FunctionCode,
-			"unit_id", tcpFrame.UnitID,
-			"data_len", len(tcpFrame.Data),
-		)
+		// s.log.Debug("收到Modbus请求",
+		// 	"transaction_id", tcpFrame.TransactionID,
+		// 	"function_code", tcpFrame.FunctionCode,
+		// 	"unit_id", tcpFrame.UnitID,
+		// 	"data_len", len(tcpFrame.Data),
+		// )
 		response := s.handleRequest(tcpFrame)
 		if response != nil {
 			encoded := response.Encode()
-			s.log.Debug("编码响应",
-				"len", len(encoded),
-				"data", fmt.Sprintf("%X", encoded),
-			)
+			// s.log.Debug("编码响应",
+			// 	"len", len(encoded),
+			// 	"data", fmt.Sprintf("%X", encoded),
+			// )
 			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			n, err := conn.Write(encoded)
 			if err != nil {
 				s.log.Error("发送响应失败", "error", err, "bytes_written", n)
 				return
 			}
-			s.log.Debug("发送Modbus响应",
-				"transaction_id", response.TransactionID,
-				"function_code", response.FunctionCode,
-				"data_len", len(response.Data),
-				"bytes_written", n,
-			)
+			// s.log.Debug("发送Modbus响应",
+			// 	"transaction_id", response.TransactionID,
+			// 	"function_code", response.FunctionCode,
+			// 	"data_len", len(response.Data),
+			// 	"bytes_written", n,
+			// )
 		}
 	}
 }
@@ -347,12 +347,12 @@ func (s *Server) handleReadRegs(request, response *modbus.TCPFrame) *modbus.TCPF
 	startAddr := uint16(request.Data[0])<<8 | uint16(request.Data[1])
 	quantity := uint16(request.Data[2])<<8 | uint16(request.Data[3])
 
-	s.log.Debug("读取寄存器",
-		"start_addr", startAddr,
-		"quantity", quantity,
-		"data_len", len(request.Data),
-		"data", fmt.Sprintf("%X", request.Data),
-	)
+	// s.log.Debug("读取寄存器",
+	// 	"start_addr", startAddr,
+	// 	"quantity", quantity,
+	// 	"data_len", len(request.Data),
+	// 	"data", fmt.Sprintf("%X", request.Data),
+	// )
 
 	data, exCode := s.store.ReadRegisters(startAddr, quantity)
 	if exCode != 0 {

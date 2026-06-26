@@ -220,16 +220,37 @@ func (h *MappingHandler) Import(c *gin.Context) {
 
 	// 跳过表头，解析数据行
 	configRules := make([]config.MappingRule, 0, len(records)-1)
-	for _, row := range records[1:] {
+	var parseErrors []string
+	for i, row := range records[1:] {
 		if len(row) < 10 {
 			continue
 		}
 
-		srcReg, _ := strconv.ParseUint(row[2], 10, 16)
-		regCount, _ := strconv.Atoi(row[5])
-		tgtReg, _ := strconv.ParseUint(row[6], 10, 16)
-		scale, _ := strconv.ParseFloat(row[7], 64)
-		offset, _ := strconv.ParseFloat(row[8], 64)
+		srcReg, err := strconv.ParseUint(row[2], 10, 16)
+		if err != nil {
+			parseErrors = append(parseErrors, fmt.Sprintf("第%d行: 寄存器地址解析失败", i+2))
+			continue
+		}
+		regCount, err := strconv.Atoi(row[5])
+		if err != nil {
+			parseErrors = append(parseErrors, fmt.Sprintf("第%d行: 寄存器数量解析失败", i+2))
+			continue
+		}
+		tgtReg, err := strconv.ParseUint(row[6], 10, 16)
+		if err != nil {
+			parseErrors = append(parseErrors, fmt.Sprintf("第%d行: 目标寄存器解析失败", i+2))
+			continue
+		}
+		scale, err := strconv.ParseFloat(row[7], 64)
+		if err != nil {
+			parseErrors = append(parseErrors, fmt.Sprintf("第%d行: 系数解析失败", i+2))
+			continue
+		}
+		offset, err := strconv.ParseFloat(row[8], 64)
+		if err != nil {
+			parseErrors = append(parseErrors, fmt.Sprintf("第%d行: 偏移量解析失败", i+2))
+			continue
+		}
 
 		configRules = append(configRules, config.MappingRule{
 			Name:            row[0],
@@ -247,7 +268,14 @@ func (h *MappingHandler) Import(c *gin.Context) {
 
 	// 保存到配置
 	if len(configRules) > 0 {
-		h.cfgMgr.SetMappingRules(deviceID, configRules)
+		if err := h.cfgMgr.SetMappingRules(deviceID, configRules); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "保存配置失败: " + err.Error()})
+			return
+		}
+	}
+
+	if len(parseErrors) > 0 {
+		h.log.Warn("CSV导入部分行解析失败", "device_id", deviceID, "errors", parseErrors)
 	}
 
 	h.log.Info("导入点表成功", "device_id", deviceID, "rules", len(configRules))

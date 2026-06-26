@@ -47,3 +47,29 @@ installer.iss
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 大文件
+go1.21.13.linux-amd64.tar.gz
+go1.21.13.linux-amd64.tar.gz.*
+
+# 临时文档
+*.md
+!README.md
+
+# 工控机配置文件
+工控机配置文件/
+
+# 测试脚本
+test_*.sh
+test_*.bat
+
+# mimocode
+.mimocode/
+
+# IEC 测试文件
+IEC
+
+# 图片
+*.png
+*.jpg
+*.jpeg

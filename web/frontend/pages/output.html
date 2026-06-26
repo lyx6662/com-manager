@@ -2,14 +2,9 @@
     <h4 class="mb-0">
         <i class="bi bi-box-arrow-right me-2"></i>输出管理
     </h4>
-    <div>
-        <button class="btn btn-success me-2" onclick="oneClickConfig()">
-            <i class="bi bi-magic me-1"></i>一键配置
-        </button>
-        <button class="btn btn-outline-primary" onclick="loadAllOutputData()">
-            <i class="bi bi-arrow-clockwise me-1"></i>刷新
-        </button>
-    </div>
+    <button class="btn btn-outline-primary" onclick="loadAllOutputData()">
+        <i class="bi bi-arrow-clockwise me-1"></i>刷新
+    </button>
 </div>
 
 <!-- Tab 导航 -->
@@ -28,102 +23,46 @@
 
 <!-- Modbus 输出 Tab -->
 <div id="tabModbus" class="output-tab">
-    <div class="row">
-        <!-- 左侧：输出服务器列表 -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-list me-1"></i>输出服务器</span>
-                    <button class="btn btn-sm btn-primary" onclick="showAddOutput()">
-                        <i class="bi bi-plus"></i>
-                    </button>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush" id="outputServerList">
-                        <div class="list-group-item text-center text-muted py-3">加载中...</div>
-                    </div>
-                </div>
+    <!-- Modbus 输出总开关 -->
+    <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0"><i class="bi bi-ethernet me-2"></i>Modbus 输出服务</h5>
+                <small class="text-muted">启用后将对外提供 Modbus TCP/RTU 数据输出</small>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="modbusEnabledSwitch" onchange="toggleModbusEnabled()" style="width: 3em; height: 1.5em;">
+                <label class="form-check-label ms-2" for="modbusEnabledSwitch" id="modbusEnabledLabel">已禁用</label>
             </div>
         </div>
-
-        <!-- 右侧：映射规则配置 -->
-        <div class="col-md-9">
-            <div id="modbusMappingPanel">
-                <div class="card">
-                    <div class="card-body text-center text-muted py-5">
-                        <i class="bi bi-arrow-left-circle" style="font-size: 2rem;"></i>
-                        <p class="mt-2">请从左侧选择输出服务器</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+    </div>
+    <div id="modbusOutputContainer">
+        <div class="text-center text-muted py-3">加载中...</div>
+    </div>
+    <div class="mt-3">
+        <button class="btn btn-primary" onclick="showAddOutput()">
+            <i class="bi bi-plus-lg me-1"></i>新增 Modbus 输出服务器
+        </button>
     </div>
 </div>
 
 <!-- IEC 61850 输出 Tab -->
 <div id="tabIEC61850" class="output-tab" style="display:none;">
-    <div class="row">
-        <!-- IEC 61850 服务器状态 -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header">
-                    <i class="bi bi-info-circle me-1"></i>服务器状态
-                </div>
-                <div class="card-body" id="iec61850StatusPanel">
-                    <div class="text-center text-muted py-3">加载中...</div>
-                </div>
+    <!-- IEC 61850 输出总开关 -->
+    <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0"><i class="bi bi-globe me-2"></i>IEC 61850 输出服务</h5>
+                <small class="text-muted">启用后将对外提供 IEC 61850 MMS 数据输出</small>
             </div>
-            <div class="card mt-3">
-                <div class="card-header">
-                    <i class="bi bi-gear me-1"></i>快速操作
-                </div>
-                <div class="card-body">
-                    <button class="btn btn-success w-100 mb-2" onclick="iec61850OneClickConfig()">
-                        <i class="bi bi-magic me-1"></i>一键配置 IEC 61850
-                    </button>
-                    <button class="btn btn-outline-primary w-100" onclick="showAddIEC61850Mapping()">
-                        <i class="bi bi-plus me-1"></i>手动添加映射
-                    </button>
-                </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="iec61850EnabledSwitch" onchange="toggleIEC61850Enabled()" style="width: 3em; height: 1.5em;">
+                <label class="form-check-label ms-2" for="iec61850EnabledSwitch" id="iec61850EnabledLabel">已禁用</label>
             </div>
         </div>
-
-        <!-- IEC 61850 映射规则 -->
-        <div class="col-md-9">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-diagram-3 me-1"></i>映射规则 (<span id="iec61850MappingCount">0</span>)</span>
-                    <div>
-                        <button class="btn btn-sm btn-outline-danger me-1" onclick="clearIEC61850Mappings()">
-                            <i class="bi bi-trash me-1"></i>清空
-                        </button>
-                        <button class="btn btn-sm btn-primary" onclick="showAddIEC61850Mapping()">
-                            <i class="bi bi-plus me-1"></i>添加
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
-                        <table class="table table-hover table-sm mb-0">
-                            <thead class="table-light sticky-top">
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>源设备</th>
-                                    <th>源数据点</th>
-                                    <th>IEC 61850 路径</th>
-                                    <th>目标类型</th>
-                                    <th>缩放</th>
-                                    <th style="width: 80px;">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="iec61850MappingBody">
-                                <tr><td colspan="7" class="text-center text-muted py-3">加载中...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+    </div>
+    <div id="iec61850OutputContainer">
+        <div class="text-center text-muted py-3">加载中...</div>
     </div>
 </div>
 
@@ -144,7 +83,7 @@
                             <option value="rtu">Modbus RTU</option>
                         </select>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3" id="outputIdGroup">
                         <label class="form-label">输出ID</label>
                         <input type="text" class="form-control" id="outputId" required>
                     </div>
@@ -309,40 +248,35 @@
     </div>
 </div>
 
-<!-- 一键配置确认弹窗 -->
-<div class="modal fade" id="oneClickModal" tabindex="-1">
+<!-- IEC 61850 服务器配置弹窗 -->
+<div class="modal fade" id="iec61850ConfigModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">一键配置</h5>
+                <h5 class="modal-title">IEC 61850 服务器配置</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>将自动配置输出映射规则：</p>
-                <ul>
-                    <li><strong>Modbus 输出</strong>：按寄存器地址顺序转发所有数据点</li>
-                    <li><strong>IEC 61850 输出</strong>：按设备名称自动映射到 IEC 61850 路径</li>
-                </ul>
-                <p class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>此操作将覆盖现有映射配置！</p>
-                <div class="mb-3">
-                    <label class="form-label">选择输出目标</label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="ocModbus" checked>
-                        <label class="form-check-label">Modbus 输出</label>
+                <form id="iec61850ConfigForm">
+                    <div class="mb-3">
+                        <label class="form-label">监听端口</label>
+                        <input type="number" class="form-control" id="iec61850Port" value="102" min="1" max="65535">
+                        <div class="form-text">IEC 61850 MMS 默认端口为 102</div>
                     </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="ocIEC61850" checked>
-                        <label class="form-check-label">IEC 61850 输出</label>
+                    <div class="mb-3">
+                        <label class="form-label">IED 名称</label>
+                        <input type="text" class="form-control" id="iec61850IEDName" placeholder="如: GW">
+                        <div class="form-text">智能电子设备名称</div>
                     </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">起始寄存器地址 (Modbus)</label>
-                    <input type="number" class="form-control" id="ocStartRegister" value="0" min="0">
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">最大连接数</label>
+                        <input type="number" class="form-control" id="iec61850MaxConn" value="10" min="1">
+                    </div>
+                </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-success" onclick="executeOneClickConfig()">确认配置</button>
+                <button type="button" class="btn btn-primary" onclick="saveIEC61850Config()">保存</button>
             </div>
         </div>
     </div>
@@ -355,6 +289,8 @@ var selectedOutputId = '';
 var allDataPoints = [];
 var iec61850Mappings = [];
 var editingModbusMappingIndex = -1;
+var modbusEnabled = false;
+var iec61850Enabled = false;
 
 // Tab 切换
 function switchOutputTab(tab) {
@@ -370,13 +306,102 @@ async function initOutputPage() {
 }
 
 async function loadAllOutputData() {
-    await Promise.all([loadOutputs(), loadDataPoints()]);
-    renderOutputServerList();
-    if (selectedOutputId) {
-        var found = false;
-        tcpOutputs.forEach(function(o) { if (o.id === selectedOutputId) found = true; });
-        rtuOutputs.forEach(function(o) { if (o.id === selectedOutputId) found = true; });
-        if (found) selectOutput(selectedOutputId);
+    await Promise.all([loadOutputs(), loadDataPoints(), loadModbusEnabledStatus(), loadIEC61850EnabledStatus()]);
+    renderModbusOutputs();
+    // 自动加载所有输出的映射规则
+    var allOutputs = [];
+    tcpOutputs.forEach(function(o) { allOutputs.push(o.id); });
+    rtuOutputs.forEach(function(o) { allOutputs.push(o.id); });
+    for (var i = 0; i < allOutputs.length; i++) {
+        await renderModbusMappingPanel(allOutputs[i]);
+    }
+}
+
+// 加载Modbus输出启用状态
+async function loadModbusEnabledStatus() {
+    try {
+        var result = await api('GET', '/outputs');
+        if (result && result.code === 0) {
+            modbusEnabled = result.data.enabled || false;
+            updateModbusEnabledUI();
+        }
+    } catch (error) {
+        console.error('加载Modbus输出状态失败:', error);
+    }
+}
+
+// 更新Modbus启用状态UI
+function updateModbusEnabledUI() {
+    var switchEl = document.getElementById('modbusEnabledSwitch');
+    var labelEl = document.getElementById('modbusEnabledLabel');
+    if (switchEl) {
+        switchEl.checked = modbusEnabled;
+        labelEl.textContent = modbusEnabled ? '已启用' : '已禁用';
+        labelEl.className = 'form-check-label ms-2 ' + (modbusEnabled ? 'text-success' : 'text-secondary');
+    }
+}
+
+// 切换Modbus输出启用状态
+async function toggleModbusEnabled() {
+    var switchEl = document.getElementById('modbusEnabledSwitch');
+    var newState = switchEl.checked;
+    try {
+        var result = await api('POST', '/outputs/toggle', { enabled: newState });
+        if (result && result.code === 0) {
+            modbusEnabled = newState;
+            updateModbusEnabledUI();
+            showToast('Modbus 输出已' + (newState ? '启用' : '禁用'));
+        } else {
+            switchEl.checked = !newState;
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        switchEl.checked = !newState;
+        showToast('网络错误', 'danger');
+    }
+}
+
+// 加载IEC 61850启用状态
+async function loadIEC61850EnabledStatus() {
+    try {
+        var result = await api('GET', '/iec61850/config');
+        if (result && result.code === 0 && result.data && result.data.iec61850) {
+            iec61850Enabled = result.data.iec61850.enabled || false;
+            updateIEC61850EnabledUI();
+        }
+    } catch (error) {
+        console.error('加载IEC 61850状态失败:', error);
+    }
+}
+
+// 更新IEC 61850启用状态UI
+function updateIEC61850EnabledUI() {
+    var switchEl = document.getElementById('iec61850EnabledSwitch');
+    var labelEl = document.getElementById('iec61850EnabledLabel');
+    if (switchEl) {
+        switchEl.checked = iec61850Enabled;
+        labelEl.textContent = iec61850Enabled ? '已启用' : '已禁用';
+        labelEl.className = 'form-check-label ms-2 ' + (iec61850Enabled ? 'text-success' : 'text-secondary');
+    }
+}
+
+// 切换IEC 61850启用状态
+async function toggleIEC61850Enabled() {
+    var switchEl = document.getElementById('iec61850EnabledSwitch');
+    var newState = switchEl.checked;
+    try {
+        var result = await api('PUT', '/iec61850/config', { enabled: newState });
+        if (result && result.code === 0) {
+            iec61850Enabled = newState;
+            updateIEC61850EnabledUI();
+            showToast('IEC 61850 输出已' + (newState ? '启用' : '禁用'));
+        } else {
+            switchEl.checked = !newState;
+            showToast(result.message || '操作失败', 'danger');
+        }
+    } catch (error) {
+        switchEl.checked = !newState;
+        showToast('网络错误', 'danger');
     }
 }
 
@@ -405,78 +430,80 @@ async function loadDataPoints() {
     }
 }
 
-// 渲染输出服务器列表
-function renderOutputServerList() {
-    var list = document.getElementById('outputServerList');
+// 渲染 Modbus 输出卡片列表
+function renderModbusOutputs() {
+    var container = document.getElementById('modbusOutputContainer');
     var allOutputs = [];
     tcpOutputs.forEach(function(o) { allOutputs.push({ type: 'tcp', data: o }); });
     rtuOutputs.forEach(function(o) { allOutputs.push({ type: 'rtu', data: o }); });
 
     if (allOutputs.length === 0) {
-        list.innerHTML = '<div class="list-group-item text-center text-muted py-3">暂无配置</div>';
+        container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-ethernet" style="font-size:2rem;"></i><p class="mt-2">暂无 Modbus 输出服务器</p></div>';
         return;
     }
 
-    list.innerHTML = allOutputs.map(function(item) {
+    container.innerHTML = allOutputs.map(function(item) {
+        var o = item.data;
         var icon = item.type === 'tcp' ? 'bi-ethernet' : 'bi-usb';
-        var info = item.type === 'tcp' ? '端口:' + item.data.listen_port : '串口:' + item.data.port;
-        var active = selectedOutputId === item.data.id ? 'active' : '';
-        return '<a href="#" class="list-group-item list-group-item-action ' + active + '" ' +
-               'onclick="selectOutput(\'' + item.data.id + '\')">' +
-               '<div><i class="bi ' + icon + ' me-2"></i><strong>' + item.data.name + '</strong></div>' +
-               '<small class="text-muted">' + info + ' | 从站:' + item.data.slave_id + '</small></a>';
+        var info = item.type === 'tcp' ? '端口:' + (o.listen_port || '-') : '串口:' + (o.port || '-');
+        return '<div class="card mb-3">' +
+            '<div class="card-header d-flex justify-content-between align-items-center">' +
+                '<span><i class="bi ' + icon + ' me-2"></i><strong>' + o.name + '</strong> <small class="text-muted ms-2">' + info + ' | 从站:' + o.slave_id + '</small></span>' +
+                '<div>' +
+                    '<button class="btn btn-sm btn-outline-primary me-1" onclick="editOutput(\'' + o.id + '\')"><i class="bi bi-pencil"></i> 编辑</button>' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="deleteOutput(\'' + o.id + '\')"><i class="bi bi-trash"></i> 删除</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="card-body p-0" id="modbus-panel-' + o.id + '">' +
+                '<div class="text-center text-muted py-3"><i class="bi bi-arrow-repeat spin me-1"></i>加载中...</div>' +
+            '</div>' +
+        '</div>';
     }).join('');
 }
 
 // 选择输出服务器
 async function selectOutput(outputId) {
     selectedOutputId = outputId;
-    renderOutputServerList();
     await renderModbusMappingPanel(outputId);
 }
 
 // 渲染 Modbus 映射配置面板
 async function renderModbusMappingPanel(outputId) {
-    var panel = document.getElementById('modbusMappingPanel');
+    var panel = document.getElementById('modbus-panel-' + outputId);
+    if (!panel) return;
+
     var output = null;
     tcpOutputs.forEach(function(o) { if (o.id === outputId) output = o; });
     rtuOutputs.forEach(function(o) { if (o.id === outputId) output = o; });
     if (!output) return;
 
-    // 获取该输出服务器关联的设备列表
     var deviceIds = await getOutputDevices(outputId);
 
-    // 加载所有设备的映射规则
     var allMappings = [];
     for (var i = 0; i < deviceIds.length; i++) {
         try {
-            var result = await api('GET', '/mappings/' + deviceIds[i]);
-            if (result && result.code === 0 && result.data && result.data.rules) {
-                result.data.rules.forEach(function(r) { allMappings.push(r); });
+            var result = await api('GET', '/output-mappings/' + deviceIds[i]);
+            if (result && result.code === 0 && result.data && result.data.mappings) {
+                result.data.mappings.forEach(function(r) {
+                    r.source_device = deviceIds[i];
+                    allMappings.push(r);
+                });
             }
         } catch (e) {}
     }
 
-    var html = '<div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">' +
-        '<span><i class="bi bi-gear me-1"></i>' + output.name + '</span>' +
-        '<div><button class="btn btn-sm btn-outline-primary me-1" onclick="editOutput(\'' + outputId + '\')"><i class="bi bi-pencil"></i> 编辑</button>' +
-        '<button class="btn btn-sm btn-outline-danger" onclick="deleteOutput(\'' + outputId + '\')"><i class="bi bi-trash"></i> 删除</button></div></div>' +
-        '<div class="card-body"><div class="row">' +
-        '<div class="col-md-3"><small class="text-muted">ID:</small><br><code>' + output.id + '</code></div>' +
-        '<div class="col-md-3"><small class="text-muted">从站ID:</small><br>' + output.slave_id + '</div>' +
-        '<div class="col-md-3"><small class="text-muted">关联设备:</small><br>' + deviceIds.length + ' 个</div>' +
-        '<div class="col-md-3"><small class="text-muted">映射数:</small><br>' + allMappings.length + '</div>' +
-        '</div></div></div>';
-
-    // 映射规则表
-    html += '<div class="card"><div class="card-header d-flex justify-content-between align-items-center">' +
-        '<span><i class="bi bi-list-ul me-1"></i>映射规则 (' + allMappings.length + ')</span>' +
-        '<div><button class="btn btn-sm btn-success me-1" onclick="modbusOneClickConfig(\'' + outputId + '\')"><i class="bi bi-magic me-1"></i>一键配置</button>' +
-        '<button class="btn btn-sm btn-primary" onclick="showAddModbusMapping(\'' + outputId + '\')"><i class="bi bi-plus me-1"></i>添加</button></div></div>' +
-        '<div class="card-body p-0"><div class="table-responsive" style="max-height: 500px; overflow-y: auto;">' +
+    var html = '<div class="p-3">' +
+        '<div class="d-flex justify-content-between align-items-center mb-2">' +
+            '<span><i class="bi bi-list-ul me-1"></i>映射规则 (' + allMappings.length + ')</span>' +
+            '<div>' +
+                '<button class="btn btn-sm btn-success me-1" onclick="modbusOneClickConfig(\'' + outputId + '\')"><i class="bi bi-magic me-1"></i>一键配置</button>' +
+                '<button class="btn btn-sm btn-primary" onclick="showAddModbusMapping(\'' + outputId + '\')"><i class="bi bi-plus me-1"></i>添加</button>' +
+            '</div>' +
+        '</div>' +
+        '<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">' +
         '<table class="table table-hover table-sm mb-0"><thead class="table-light sticky-top"><tr>' +
         '<th style="width:40px">#</th><th>设备</th><th>数据点</th><th>源寄存器</th><th>目标寄存器</th><th>类型</th><th>缩放</th><th style="width:80px">操作</th>' +
-        '</tr></thead><tbody id="modbusMappingBody">';
+        '</tr></thead><tbody id="modbusMappingBody-' + outputId + '">';
 
     if (allMappings.length === 0) {
         html += '<tr><td colspan="8" class="text-center text-muted py-3">暂无映射规则，点击"一键配置"或"添加"</td></tr>';
@@ -490,30 +517,42 @@ async function renderModbusMappingPanel(outputId) {
                 '<td>' + (m.target_register || 0) + '</td>' +
                 '<td><span class="badge bg-secondary">' + (m.data_type || 'uint16') + '</span></td>' +
                 '<td>' + (m.scale || 1) + '</td>' +
-                '<td><button class="btn btn-sm btn-outline-danger" onclick="deleteModbusMapping(\'' + (m.source_device || '') + '\', \'' + (m.name || '') + '\')"><i class="bi bi-trash"></i></button></td>' +
+                '<td>' +
+                    '<button class="btn btn-sm btn-outline-primary me-1" onclick="editModbusMapping(\'' + (m.source_device || '') + '\', \'' + (m.name || '') + '\', ' + i + ', \'' + outputId + '\')"><i class="bi bi-pencil"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="deleteModbusMapping(\'' + (m.source_device || '') + '\', \'' + (m.name || '') + '\', \'' + outputId + '\')"><i class="bi bi-trash"></i></button>' +
+                '</td>' +
                 '</tr>';
         });
     }
 
-    html += '</tbody></table></div></div></div>';
+    html += '</tbody></table></div></div>';
     panel.innerHTML = html;
 }
 
 // 获取输出服务器关联的设备列表
 async function getOutputDevices(outputId) {
+    // 先从 groups 配置中查找
     try {
         var result = await api('GET', '/groups');
         if (result && result.code === 0) {
             var groups = result.data || [];
             for (var i = 0; i < groups.length; i++) {
-                if (groups[i].id === outputId || groups[i].output_id === outputId) {
-                    return groups[i].devices || [];
+                if ((groups[i].id === outputId || groups[i].output_id === outputId) && groups[i].devices && groups[i].devices.length > 0) {
+                    return groups[i].devices;
                 }
             }
         }
     } catch (e) {}
 
-    // 如果没有找到分组配置，返回所有设备
+    // 从设备列表 API 获取所有设备
+    try {
+        var devResult = await api('GET', '/devices');
+        if (devResult && devResult.code === 0 && devResult.data) {
+            return devResult.data.map(function(d) { return d.id; });
+        }
+    } catch (e) {}
+
+    // 最后从数据池获取
     var deviceIds = [];
     allDataPoints.forEach(function(p) {
         if (deviceIds.indexOf(p.device_id) < 0) deviceIds.push(p.device_id);
@@ -530,8 +569,8 @@ function showAddModbusMapping(outputId) {
     document.getElementById('mmOffset').value = '0';
     document.getElementById('mmTargetRegister').value = '0';
 
-    // 填充数据点下拉框
     var select = document.getElementById('mmSourcePoint');
+    select.disabled = false; // 启用源数据点下拉框
     select.innerHTML = '<option value="">选择数据点...</option>';
     var sorted = allDataPoints.slice().sort(function(a, b) {
         if (a.device_id !== b.device_id) return a.device_id.localeCompare(b.device_id);
@@ -550,40 +589,31 @@ function showAddModbusMapping(outputId) {
 // 保存 Modbus 映射
 async function saveModbusMapping() {
     var sourceId = document.getElementById('mmSourcePoint').value;
-    if (!sourceId) {
-        showToast('请选择源数据点', 'warning');
-        return;
-    }
+    if (!sourceId) { showToast('请选择源数据点', 'warning'); return; }
 
     var parts = sourceId.split('.');
     var deviceId = parts[0];
     var pointName = parts.slice(1).join('.');
 
-    var newRule = {
+    var newMapping = {
         name: pointName,
-        source_device: deviceId,
-        source_register: 0,
-        source_type: 'holding',
-        data_type: document.getElementById('mmDataType').value,
-        register_count: 1,
         target_register: parseInt(document.getElementById('mmTargetRegister').value),
         scale: parseFloat(document.getElementById('mmScale').value) || 1,
         offset: parseFloat(document.getElementById('mmOffset').value) || 0,
         unit: ''
     };
 
-    // 获取该设备的当前映射
     try {
-        var result = await api('GET', '/mappings/' + deviceId);
-        var rules = (result && result.code === 0 && result.data && result.data.rules) ? result.data.rules : [];
+        var result = await api('GET', '/output-mappings/' + deviceId);
+        var mappings = (result && result.code === 0 && result.data && result.data.mappings) ? result.data.mappings : [];
 
         if (editingModbusMappingIndex >= 0) {
-            rules[editingModbusMappingIndex] = newRule;
+            mappings[editingModbusMappingIndex] = newMapping;
         } else {
-            rules.push(newRule);
+            mappings.push(newMapping);
         }
 
-        var saveResult = await api('PUT', '/mappings/' + deviceId, { rules: rules });
+        var saveResult = await api('PUT', '/output-mappings/' + deviceId, mappings);
         if (saveResult && saveResult.code === 0) {
             showToast('映射保存成功');
             bootstrap.Modal.getInstance(document.getElementById('modbusMappingModal'))?.hide();
@@ -596,16 +626,46 @@ async function saveModbusMapping() {
     }
 }
 
+// 编辑 Modbus 映射
+async function editModbusMapping(deviceId, pointName, index, outputId) {
+    editingModbusMappingIndex = index;
+    document.getElementById('modbusMappingModalTitle').textContent = '编辑映射';
+
+    // 获取当前映射配置
+    try {
+        var result = await api('GET', '/output-mappings/' + deviceId);
+        if (result && result.code === 0 && result.data && result.data.mappings) {
+            var mapping = result.data.mappings[index];
+            if (mapping) {
+                // 设置表单值
+                document.getElementById('mmTargetRegister').value = mapping.target_register || 0;
+                document.getElementById('mmScale').value = mapping.scale || 1;
+                document.getElementById('mmOffset').value = mapping.offset || 0;
+
+                // 设置源数据点下拉框
+                var select = document.getElementById('mmSourcePoint');
+                select.innerHTML = '<option value="' + deviceId + '.' + pointName + '" selected>' + deviceId + '.' + pointName + '</option>';
+                select.disabled = true; // 编辑时不允许修改源数据点
+            }
+        }
+    } catch (error) {
+        console.error('获取映射配置失败:', error);
+    }
+
+    new bootstrap.Modal(document.getElementById('modbusMappingModal')).show();
+}
+
 // 删除 Modbus 映射
-async function deleteModbusMapping(deviceId, pointName) {
+async function deleteModbusMapping(deviceId, pointName, outputId) {
     if (!await confirmAction('确定删除该映射规则？')) return;
     try {
-        var result = await api('GET', '/mappings/' + deviceId);
-        if (result && result.code === 0 && result.data && result.data.rules) {
-            var rules = result.data.rules.filter(function(r) { return r.name !== pointName; });
-            await api('PUT', '/mappings/' + deviceId, { rules: rules });
+        var result = await api('GET', '/output-mappings/' + deviceId);
+        if (result && result.code === 0 && result.data && result.data.mappings) {
+            var mappings = result.data.mappings.filter(function(r) { return r.name !== pointName; });
+            await api('PUT', '/output-mappings/' + deviceId, mappings);
             showToast('映射已删除');
-            if (selectedOutputId) await renderModbusMappingPanel(selectedOutputId);
+            var targetOutput = outputId || selectedOutputId;
+            if (targetOutput) await renderModbusMappingPanel(targetOutput);
         }
     } catch (error) {
         showToast('删除失败', 'danger');
@@ -616,46 +676,61 @@ async function deleteModbusMapping(deviceId, pointName) {
 async function modbusOneClickConfig(outputId) {
     if (!await confirmAction('将按寄存器顺序自动配置所有数据点的映射，是否继续？')) return;
 
-    // 获取关联设备
     var deviceIds = await getOutputDevices(outputId);
     if (deviceIds.length === 0) {
-        // 使用所有设备
         allDataPoints.forEach(function(p) {
             if (deviceIds.indexOf(p.device_id) < 0) deviceIds.push(p.device_id);
         });
     }
 
+    // 读取每个设备的采集配置
     var startReg = 0;
     var totalMappings = 0;
 
-    // 为每个设备创建映射规则
     for (var d = 0; d < deviceIds.length; d++) {
         var deviceId = deviceIds[d];
-        var devicePoints = allDataPoints.filter(function(p) { return p.device_id === deviceId; });
-        devicePoints.sort(function(a, b) { return a.point_name.localeCompare(b.point_name); });
+        // 先获取设备的采集点表
+        var dataPoints = [];
+        try {
+            var result = await api('GET', '/datapoints/' + deviceId);
+            if (result && result.code === 0 && result.data && result.data.points) {
+                dataPoints = result.data.points;
+            }
+        } catch (e) {}
 
-        var rules = [];
-        devicePoints.forEach(function(p, i) {
-            rules.push({
-                name: p.point_name,
-                source_device: p.device_id,
-                source_register: 0,
-                source_type: 'holding',
-                data_type: p.data_type || 'uint16',
-                register_count: 1,
-                target_register: startReg + i,
-                scale: 1,
-                offset: 0,
-                unit: ''
+        var mappings = [];
+        if (dataPoints.length > 0) {
+            // 使用设备的采集点表，按顺序映射
+            dataPoints.forEach(function(p, i) {
+                mappings.push({
+                    name: p.name,
+                    target_register: startReg + i,
+                    scale: 1,
+                    offset: 0,
+                    unit: ''
+                });
             });
-        });
+        } else {
+            // 如果没有采集配置，使用数据池
+            var devicePoints = allDataPoints.filter(function(p) { return p.device_id === deviceId; });
+            devicePoints.sort(function(a, b) { return a.point_name.localeCompare(b.point_name); });
+            devicePoints.forEach(function(p, i) {
+                mappings.push({
+                    name: p.point_name,
+                    target_register: startReg + i,
+                    scale: 1,
+                    offset: 0,
+                    unit: ''
+                });
+            });
+        }
 
         try {
-            await api('PUT', '/mappings/' + deviceId, { rules: rules });
-            totalMappings += rules.length;
-            startReg += rules.length;
+            await api('PUT', '/output-mappings/' + deviceId, mappings);
+            totalMappings += mappings.length;
+            startReg += mappings.length;
         } catch (e) {
-            console.error('配置设备 ' + deviceId + ' 映射失败:', e);
+            console.error('配置设备 ' + deviceId + ' 输出映射失败:', e);
         }
     }
 
@@ -663,106 +738,115 @@ async function modbusOneClickConfig(outputId) {
     await renderModbusMappingPanel(outputId);
 }
 
-// 显示一键配置弹窗
-function oneClickConfig() {
-    new bootstrap.Modal(document.getElementById('oneClickModal')).show();
-}
-
-// 执行一键配置
-async function executeOneClickConfig() {
-    var doModbus = document.getElementById('ocModbus').checked;
-    var doIEC = document.getElementById('ocIEC61850').checked;
-
-    bootstrap.Modal.getInstance(document.getElementById('oneClickModal'))?.hide();
-
-    if (doModbus) {
-        // 为所有设备配置 Modbus 映射
-        var deviceIds = [];
-        allDataPoints.forEach(function(p) {
-            if (deviceIds.indexOf(p.device_id) < 0) deviceIds.push(p.device_id);
-        });
-
-        var startReg = 0;
-        for (var d = 0; d < deviceIds.length; d++) {
-            var devicePoints = allDataPoints.filter(function(p) { return p.device_id === deviceIds[d]; });
-            devicePoints.sort(function(a, b) { return a.point_name.localeCompare(b.point_name); });
-
-            var rules = [];
-            devicePoints.forEach(function(p, i) {
-                rules.push({
-                    name: p.point_name,
-                    source_device: p.device_id,
-                    source_register: 0,
-                    source_type: 'holding',
-                    data_type: p.data_type || 'uint16',
-                    register_count: 1,
-                    target_register: startReg + i,
-                    scale: 1,
-                    offset: 0,
-                    unit: ''
-                });
-            });
-
-            try {
-                await api('PUT', '/mappings/' + deviceIds[d], { rules: rules });
-                startReg += rules.length;
-            } catch (e) {
-                console.error('配置设备映射失败:', e);
-            }
-        }
-        showToast('Modbus 映射配置完成');
-    }
-
-    if (doIEC) {
-        await iec61850OneClickConfig();
-    }
-
-    if (selectedOutputId) await renderModbusMappingPanel(selectedOutputId);
-}
-
 // IEC 61850 一键配置
 async function iec61850OneClickConfig() {
-    // 按设备分组
-    var deviceGroups = {};
-    allDataPoints.forEach(function(p) {
-        if (!deviceGroups[p.device_id]) deviceGroups[p.device_id] = [];
-        deviceGroups[p.device_id].push(p);
-    });
+    if (!await confirmAction('将自动配置 IEC 61850 映射，是否继续？')) return;
+
+    // 从设备列表接口获取所有设备
+    var deviceIds = [];
+    try {
+        var devicesResult = await api('GET', '/devices');
+        if (devicesResult && devicesResult.code === 0 && devicesResult.data) {
+            devicesResult.data.forEach(function(d) {
+                deviceIds.push(d.id);
+            });
+        }
+    } catch (e) {}
+    deviceIds.sort();
+
+    // 获取当前 IEC 61850 模型配置
+    var modelConfig = null;
+    try {
+        var configResult = await api('GET', '/iec61850/config');
+        if (configResult && configResult.code === 0 && configResult.data) {
+            modelConfig = configResult.data.model;
+        }
+    } catch (e) {}
+
+    // 获取现有的逻辑节点
+    var existingNodes = [];
+    if (modelConfig && modelConfig.logical_devices) {
+        modelConfig.logical_devices.forEach(function(ld) {
+            if (ld.logical_nodes) {
+                ld.logical_nodes.forEach(function(ln) {
+                    existingNodes.push(ln.name);
+                });
+            }
+        });
+    }
 
     var mappings = [];
     var deviceIndex = 1;
 
-    Object.keys(deviceGroups).sort().forEach(function(deviceId) {
-        var points = deviceGroups[deviceId].sort(function(a, b) {
-            return a.point_name.localeCompare(b.point_name);
-        });
-
-        // 生成设备名称（如 MMXU1, MMXU2, ...）
+    for (var d = 0; d < deviceIds.length; d++) {
+        var deviceId = deviceIds[d];
         var mmxuName = 'MMXU' + deviceIndex;
 
-        points.forEach(function(p, pointIndex) {
-            mappings.push({
-                source_device: p.device_id,
-                source_name: p.point_name,
-                iec61850_path: 'WG/' + mmxuName + '.TotW' + pointIndex + '.mag.f',
-                target_type: 'float32',
-                scale: 1,
-                offset: 0
+        // 先获取设备的采集点表，确定需要多少个数据对象
+        var dataPoints = [];
+        try {
+            var result = await api('GET', '/datapoints/' + deviceId);
+            if (result && result.code === 0 && result.data && result.data.points) {
+                dataPoints = result.data.points;
+            }
+        } catch (e) {}
+
+        var pointCount = dataPoints.length;
+        if (pointCount === 0) {
+            var devicePoints = allDataPoints.filter(function(p) { return p.device_id === deviceId; });
+            pointCount = devicePoints.length;
+        }
+
+        // 检查并创建缺失的逻辑节点
+        if (existingNodes.indexOf(mmxuName) < 0) {
+            try {
+                var nodeResult = await api('POST', '/iec61850/model/devices/WG/nodes', {
+                    name: mmxuName,
+                    data_objects: generateDefaultDataObjects(pointCount)
+                });
+                if (nodeResult && nodeResult.code === 0) {
+                    console.log('自动创建逻辑节点: ' + mmxuName + '，包含 ' + pointCount + ' 个数据对象');
+                }
+            } catch (e) {
+                console.error('创建逻辑节点失败: ' + mmxuName, e);
+            }
+        }
+
+        // 生成映射规则
+        if (dataPoints.length > 0) {
+            dataPoints.forEach(function(p, i) {
+                mappings.push({
+                    source_device: deviceId,
+                    source_name: p.name,
+                    iec61850_path: 'WG/' + mmxuName + '.TotW' + i + '.mag.f',
+                    target_type: 'float32',
+                    scale: 1,
+                    offset: 0
+                });
             });
-        });
+        } else {
+            var devicePoints = allDataPoints.filter(function(p) { return p.device_id === deviceId; });
+            devicePoints.sort(function(a, b) { return a.point_name.localeCompare(b.point_name); });
+            devicePoints.forEach(function(p, i) {
+                mappings.push({
+                    source_device: p.device_id,
+                    source_name: p.point_name,
+                    iec61850_path: 'WG/' + mmxuName + '.TotW' + i + '.mag.f',
+                    target_type: 'float32',
+                    scale: 1,
+                    offset: 0
+                });
+            });
+        }
 
         deviceIndex++;
-    });
+    }
 
     try {
-        // 先清空现有映射
         await api('PUT', '/iec61850/mappings', []);
-
-        // 逐个添加
         for (var i = 0; i < mappings.length; i++) {
             await api('POST', '/iec61850/mappings', mappings[i]);
         }
-
         showToast('IEC 61850 一键配置完成，共 ' + mappings.length + ' 个映射');
         await loadIEC61850Data();
     } catch (error) {
@@ -770,63 +854,165 @@ async function iec61850OneClickConfig() {
     }
 }
 
+// 生成默认的数据对象（用于自动创建逻辑节点）
+function generateDefaultDataObjects(count) {
+    var num = count || 20; // 默认生成20个数据对象
+    var dataObjects = [];
+    for (var i = 0; i < num; i++) {
+        dataObjects.push({
+            name: 'TotW' + i,
+            data_attributes: [
+                { name: 'q', type: 'QUALITY', fc: 'MX', triggers: 'QUALITY_CHANGED' },
+                { name: 't', type: 'TIMESTAMP', fc: 'MX', triggers: 'DATA_CHANGED' },
+                {
+                    name: 'mag',
+                    children: [
+                        { name: 'f', type: 'FLOAT32', fc: 'MX', triggers: 'DATA_CHANGED' }
+                    ]
+                }
+            ]
+        });
+    }
+    return dataObjects;
+}
+
 // 加载 IEC 61850 数据
 async function loadIEC61850Data() {
+    var container = document.getElementById('iec61850OutputContainer');
+
     try {
         var statusResult = await api('GET', '/iec61850/status');
-        if (statusResult && statusResult.code === 0) {
-            var status = statusResult.data;
-            var isRunning = status.enabled || status.running;
-            document.getElementById('iec61850StatusPanel').innerHTML =
-                '<table class="table table-sm mb-0">' +
-                '<tr><td class="text-muted">状态</td><td>' + (isRunning ? '<span class="badge bg-success">运行中</span>' : '<span class="badge bg-secondary">已停止</span>') + '</td></tr>' +
-                '<tr><td class="text-muted">端口</td><td>' + (status.port || '-') + '</td></tr>' +
-                '<tr><td class="text-muted">IED</td><td>' + (status.ied_name || '-') + '</td></tr>' +
-                '<tr><td class="text-muted">映射数</td><td>' + (status.mapping_count || 0) + '</td></tr>' +
-                '<tr><td class="text-muted">连接数</td><td>' + (status.active_connections || 0) + '/' + (status.max_connections || 10) + '</td></tr>' +
-                '</table>';
-        }
+        var status = (statusResult && statusResult.code === 0) ? statusResult.data : {};
+        var isRunning = status.enabled || status.running;
 
         var mappingsResult = await api('GET', '/iec61850/mappings');
-        if (mappingsResult && mappingsResult.code === 0) {
-            iec61850Mappings = mappingsResult.data || [];
-            renderIEC61850Mappings();
+        iec61850Mappings = (mappingsResult && mappingsResult.code === 0) ? (mappingsResult.data || []) : [];
+
+        var html = '<div class="card mb-3">' +
+            '<div class="card-header d-flex justify-content-between align-items-center">' +
+                '<span><i class="bi bi-broadcast me-2"></i><strong>IEC 61850 输出服务器</strong> ' +
+                    '<small class="text-muted ms-2">' +
+                        (isRunning ? '<span class="badge bg-success">运行中</span>' : '<span class="badge bg-secondary">已停止</span>') +
+                        ' | 端口:' + (status.port || '-') +
+                        ' | IED:' + (status.ied_name || '-') +
+                        ' | 连接:' + (status.active_connections || 0) + '/' + (status.max_connections || 10) +
+                    '</small>' +
+                '</span>' +
+                '<div>' +
+                    '<button class="btn btn-sm btn-outline-info me-1" onclick="showIEC61850Config()"><i class="bi bi-gear me-1"></i>配置</button>' +
+                    '<button class="btn btn-sm btn-outline-warning" onclick="restartIEC61850()"><i class="bi bi-arrow-clockwise me-1"></i>重启</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="card-body p-0">' +
+                '<div class="p-3">' +
+                    '<div class="d-flex justify-content-between align-items-center mb-2">' +
+                        '<span><i class="bi bi-list-ul me-1"></i>映射规则 (' + iec61850Mappings.length + ')</span>' +
+                        '<div>' +
+                            '<button class="btn btn-sm btn-success me-1" onclick="iec61850OneClickConfig()"><i class="bi bi-magic me-1"></i>一键配置</button>' +
+                            '<button class="btn btn-sm btn-outline-danger me-1" onclick="clearIEC61850Mappings()"><i class="bi bi-trash me-1"></i>清空</button>' +
+                            '<button class="btn btn-sm btn-primary" onclick="showAddIEC61850Mapping()"><i class="bi bi-plus me-1"></i>添加</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">' +
+                    '<table class="table table-hover table-sm mb-0"><thead class="table-light sticky-top"><tr>' +
+                    '<th style="width:40px">#</th><th>源设备</th><th>源数据点</th><th>IEC 61850 路径</th><th>目标类型</th><th>缩放</th><th style="width:80px">操作</th>' +
+                    '</tr></thead><tbody>';
+
+        if (iec61850Mappings.length === 0) {
+            html += '<tr><td colspan="7" class="text-center text-muted py-3">暂无映射规则，点击"一键配置"或"添加"</td></tr>';
+        } else {
+            iec61850Mappings.forEach(function(m, i) {
+                html += '<tr>' +
+                    '<td>' + (i + 1) + '</td>' +
+                    '<td><code>' + (m.source_device || '') + '</code></td>' +
+                    '<td>' + (m.source_name || '') + '</td>' +
+                    '<td><code>' + (m.iec61850_path || '') + '</code></td>' +
+                    '<td><span class="badge bg-info">' + (m.target_type || 'float32') + '</span></td>' +
+                    '<td>' + (m.scale || 1) + '</td>' +
+                    '<td>' +
+                        '<button class="btn btn-sm btn-outline-primary me-1" onclick="editIEC61850Mapping(' + i + ')"><i class="bi bi-pencil"></i></button>' +
+                        '<button class="btn btn-sm btn-outline-danger" onclick="deleteIEC61850Mapping(' + i + ')"><i class="bi bi-trash"></i></button>' +
+                    '</td>' +
+                    '</tr>';
+            });
         }
+
+        html += '</tbody></table></div></div></div></div>';
+        container.innerHTML = html;
     } catch (error) {
-        console.error('加载 IEC 61850 数据失败:', error);
+        container.innerHTML = '<div class="text-center text-danger py-3">加载 IEC 61850 数据失败</div>';
     }
 }
 
-// 渲染 IEC 61850 映射规则
-function renderIEC61850Mappings() {
-    document.getElementById('iec61850MappingCount').textContent = iec61850Mappings.length;
-    var tbody = document.getElementById('iec61850MappingBody');
-    if (iec61850Mappings.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">暂无映射规则，点击"一键配置"或"添加"</td></tr>';
+// 重启 IEC 61850
+async function restartIEC61850() {
+    if (!await confirmAction('确定重启 IEC 61850 服务？')) return;
+    try {
+        var result = await api('POST', '/iec61850/restart');
+        if (result && result.code === 0) {
+            showToast('IEC 61850 重启成功');
+            await loadIEC61850Data();
+        } else {
+            showToast(result.message || '重启失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
+}
+
+// 显示 IEC 61850 配置弹窗
+async function showIEC61850Config() {
+    try {
+        var result = await api('GET', '/iec61850/config');
+        if (result && result.code === 0 && result.data && result.data.iec61850) {
+            var cfg = result.data.iec61850;
+            document.getElementById('iec61850Port').value = cfg.port || 102;
+            document.getElementById('iec61850IEDName').value = cfg.ied_name || '';
+            document.getElementById('iec61850MaxConn').value = cfg.max_connections || 10;
+        }
+    } catch (error) {
+        console.error('加载IEC 61850配置失败:', error);
+    }
+    new bootstrap.Modal(document.getElementById('iec61850ConfigModal')).show();
+}
+
+// 保存 IEC 61850 配置
+async function saveIEC61850Config() {
+    var config = {
+        port: parseInt(document.getElementById('iec61850Port').value),
+        ied_name: document.getElementById('iec61850IEDName').value,
+        max_connections: parseInt(document.getElementById('iec61850MaxConn').value)
+    };
+
+    if (!config.ied_name) {
+        showToast('请填写IED名称', 'warning');
         return;
     }
 
-    tbody.innerHTML = iec61850Mappings.map(function(m, i) {
-        return '<tr>' +
-            '<td>' + (i + 1) + '</td>' +
-            '<td><code>' + (m.source_device || '') + '</code></td>' +
-            '<td>' + (m.source_name || '') + '</td>' +
-            '<td><code>' + (m.iec61850_path || '') + '</code></td>' +
-            '<td><span class="badge bg-info">' + (m.target_type || 'float32') + '</span></td>' +
-            '<td>' + (m.scale || 1) + '</td>' +
-            '<td><button class="btn btn-sm btn-outline-danger" onclick="deleteIEC61850Mapping(' + i + ')"><i class="bi bi-trash"></i></button></td>' +
-            '</tr>';
-    }).join('');
+    try {
+        var result = await api('PUT', '/iec61850/config', config);
+        if (result && result.code === 0) {
+            showToast('IEC 61850 配置保存成功，重启后生效');
+            bootstrap.Modal.getInstance(document.getElementById('iec61850ConfigModal'))?.hide();
+            await loadIEC61850Data();
+        } else {
+            showToast(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        showToast('网络错误', 'danger');
+    }
 }
 
 // 显示添加 IEC 61850 映射弹窗
 function showAddIEC61850Mapping() {
     document.getElementById('iec61850MappingModalTitle').textContent = '添加 IEC 61850 映射';
     document.getElementById('iec61850MappingForm').reset();
+    document.getElementById('iec61850MappingForm').dataset.editIndex = ''; // 清除编辑索引
     document.getElementById('imScale').value = '1';
     document.getElementById('imOffset').value = '0';
 
     var select = document.getElementById('imSourcePoint');
+    select.disabled = false; // 启用源数据点下拉框
     select.innerHTML = '<option value="">选择数据点...</option>';
     var sorted = allDataPoints.slice().sort(function(a, b) {
         if (a.device_id !== b.device_id) return a.device_id.localeCompare(b.device_id);
@@ -845,10 +1031,7 @@ function showAddIEC61850Mapping() {
 // 保存 IEC 61850 映射
 async function saveIEC61850Mapping() {
     var sourceId = document.getElementById('imSourcePoint').value;
-    if (!sourceId) {
-        showToast('请选择源数据点', 'warning');
-        return;
-    }
+    if (!sourceId) { showToast('请选择源数据点', 'warning'); return; }
 
     var parts = sourceId.split('.');
     var mapping = {
@@ -860,23 +1043,58 @@ async function saveIEC61850Mapping() {
         offset: parseFloat(document.getElementById('imOffset').value) || 0
     };
 
-    if (!mapping.iec61850_path) {
-        showToast('请输入 IEC 61850 路径', 'warning');
-        return;
-    }
+    if (!mapping.iec61850_path) { showToast('请输入 IEC 61850 路径', 'warning'); return; }
+
+    // 检查是否是编辑模式
+    var editIndex = document.getElementById('iec61850MappingForm').dataset.editIndex;
 
     try {
-        var result = await api('POST', '/iec61850/mappings', mapping);
+        var result;
+        if (editIndex !== undefined && editIndex !== '') {
+            // 编辑模式：使用 PUT 接口更新映射
+            result = await api('PUT', '/iec61850/mappings/' + editIndex, mapping);
+        } else {
+            // 添加模式：使用 POST 接口添加映射
+            result = await api('POST', '/iec61850/mappings', mapping);
+        }
+
         if (result && result.code === 0) {
-            showToast('映射添加成功');
+            showToast(editIndex !== undefined && editIndex !== '' ? '映射更新成功' : '映射添加成功');
             bootstrap.Modal.getInstance(document.getElementById('iec61850MappingModal'))?.hide();
+            // 清除编辑索引
+            document.getElementById('iec61850MappingForm').dataset.editIndex = '';
             await loadIEC61850Data();
         } else {
-            showToast(result.message || '添加失败', 'danger');
+            showToast(result.message || '保存失败', 'danger');
         }
     } catch (error) {
         showToast('网络错误', 'danger');
     }
+}
+
+// 编辑 IEC 61850 映射
+async function editIEC61850Mapping(index) {
+    if (index < 0 || index >= iec61850Mappings.length) return;
+
+    var mapping = iec61850Mappings[index];
+    document.getElementById('iec61850MappingModalTitle').textContent = '编辑 IEC 61850 映射';
+
+    // 设置表单值
+    document.getElementById('imIECPath').value = mapping.iec61850_path || '';
+    document.getElementById('imTargetType').value = mapping.target_type || 'float32';
+    document.getElementById('imScale').value = mapping.scale || 1;
+    document.getElementById('imOffset').value = mapping.offset || 0;
+
+    // 设置源数据点下拉框
+    var select = document.getElementById('imSourcePoint');
+    select.innerHTML = '<option value="' + mapping.source_device + '.' + mapping.source_name + '" selected>' +
+        mapping.source_device + '.' + mapping.source_name + '</option>';
+    select.disabled = true; // 编辑时不允许修改源数据点
+
+    // 保存编辑索引到表单
+    document.getElementById('iec61850MappingForm').dataset.editIndex = index;
+
+    new bootstrap.Modal(document.getElementById('iec61850MappingModal')).show();
 }
 
 // 删除 IEC 61850 映射
@@ -911,7 +1129,11 @@ async function clearIEC61850Mappings() {
 async function showAddOutput() {
     document.getElementById('outputModalTitle').textContent = '新增输出';
     document.getElementById('outputForm').reset();
+    // 自动生成输出ID
+    var newId = generateOutputId();
+    document.getElementById('outputId').value = newId;
     document.getElementById('outputId').disabled = false;
+    document.getElementById('outputIdGroup').style.display = 'block';
     document.getElementById('outputProtocol').value = 'tcp';
     document.getElementById('outputProtocol').disabled = false;
     document.getElementById('tcpPort').value = 502;
@@ -920,6 +1142,24 @@ async function showAddOutput() {
     await loadSerialPortsForOutput();
     toggleOutputFields();
     new bootstrap.Modal(document.getElementById('outputModal')).show();
+}
+
+// 自动生成输出ID
+function generateOutputId() {
+    var allIds = [];
+    tcpOutputs.forEach(function(o) { allIds.push(o.id); });
+    rtuOutputs.forEach(function(o) { allIds.push(o.id); });
+
+    var maxNum = 0;
+    allIds.forEach(function(id) {
+        var match = id.match(/^(tcp|rtu|output)_(\d+)$/);
+        if (match) {
+            var num = parseInt(match[2]);
+            if (num > maxNum) maxNum = num;
+        }
+    });
+
+    return 'output_' + (maxNum + 1);
 }
 
 async function editOutput(outputId) {
@@ -932,6 +1172,7 @@ async function editOutput(outputId) {
     document.getElementById('outputModalTitle').textContent = '编辑输出';
     document.getElementById('outputId').value = output.id;
     document.getElementById('outputId').disabled = true;
+    document.getElementById('outputIdGroup').style.display = 'block';
     document.getElementById('outputName').value = output.name;
     document.getElementById('outputProtocol').value = type;
     document.getElementById('outputProtocol').disabled = true;
@@ -961,23 +1202,19 @@ async function deleteOutput(outputId) {
 async function saveOutput() {
     var type = document.getElementById('outputProtocol').value;
     var output = {
-        id: document.getElementById('outputId').value,
+        id: document.getElementById('outputId').value || generateOutputId(),
         name: document.getElementById('outputName').value,
         slave_id: parseInt(document.getElementById('outputSlaveId').value)
     };
 
-    if (!output.id || !output.name) {
-        showToast('请填写ID和名称', 'warning');
-        return;
-    }
+    if (!output.name) { showToast('请填写名称', 'warning'); return; }
 
     if (type === 'tcp') {
         output.listen_port = parseInt(document.getElementById('tcpPort').value);
         output.max_connections = parseInt(document.getElementById('maxConnections').value);
         if (!document.getElementById('outputId').disabled) {
             if (tcpOutputs.some(function(o) { return o.id === output.id; }) || rtuOutputs.some(function(o) { return o.id === output.id; })) {
-                showToast('输出ID已存在', 'warning');
-                return;
+                showToast('输出ID已存在', 'warning'); return;
             }
             tcpOutputs.push(output);
         } else {
@@ -989,8 +1226,7 @@ async function saveOutput() {
         if (!output.port) { showToast('请选择串口', 'warning'); return; }
         if (!document.getElementById('outputId').disabled) {
             if (tcpOutputs.some(function(o) { return o.id === output.id; }) || rtuOutputs.some(function(o) { return o.id === output.id; })) {
-                showToast('输出ID已存在', 'warning');
-                return;
+                showToast('输出ID已存在', 'warning'); return;
             }
             rtuOutputs.push(output);
         } else {
@@ -1008,8 +1244,7 @@ async function saveOutputsToServer() {
             showToast('保存成功');
             bootstrap.Modal.getInstance(document.getElementById('outputModal'))?.hide();
             await loadOutputs();
-            renderOutputServerList();
-            if (selectedOutputId) await renderModbusMappingPanel(selectedOutputId);
+            renderModbusOutputs();
         } else {
             showToast(result.message || '保存失败', 'danger');
         }
